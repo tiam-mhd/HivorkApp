@@ -93,7 +93,3 @@ Pods/
 *.pid.lock
 .env.backup
 .vscode-test
-
-# Submodules (managed separately)
-backend/
-build/web/

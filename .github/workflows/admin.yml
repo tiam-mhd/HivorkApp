@@ -1,0 +1,96 @@
+name: Angular Admin CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'hivork-admin/**'
+      - '.github/workflows/admin.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'hivork-admin/**'
+
+jobs:
+  test:
+    name: Test Admin Dashboard
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: hivork-admin/package-lock.json
+
+      - name: Install dependencies
+        working-directory: hivork-admin
+        run: npm ci
+
+      - name: Run linter
+        working-directory: hivork-admin
+        run: npm run lint
+
+      - name: Run tests
+        working-directory: hivork-admin
+        run: npm run test:ci
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: hivork-admin/coverage/lcov.info
+          flags: admin
+
+  build:
+    name: Build Admin Dashboard
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: hivork-admin/package-lock.json
+
+      - name: Install dependencies
+        working-directory: hivork-admin
+        run: npm ci
+
+      - name: Build for production
+        working-directory: hivork-admin
+        run: npm run build:prod
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: admin-dist
+          path: hivork-admin/dist/
+
+  deploy:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: admin-dist
+          path: dist
+
+      - name: Deploy to Liara
+        run: |
+          echo "Deploying to Liara..."
+          # Add your deployment commands here

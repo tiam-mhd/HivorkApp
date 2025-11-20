@@ -1,0 +1,11 @@
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          explicit_to_json: true
+          field_rename: snake
+          checked: true
+      retrofit_generator:
+        options:
+          base_url: "http://localhost:3000/api/v1"

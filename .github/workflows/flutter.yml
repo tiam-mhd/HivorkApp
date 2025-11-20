@@ -1,0 +1,119 @@
+name: Flutter App CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'hivork-app/**'
+      - '.github/workflows/flutter.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'hivork-app/**'
+
+jobs:
+  test:
+    name: Test Flutter App
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.0'
+          channel: 'stable'
+
+      - name: Get dependencies
+        working-directory: hivork-app
+        run: flutter pub get
+
+      - name: Run code generation
+        working-directory: hivork-app
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      - name: Analyze code
+        working-directory: hivork-app
+        run: flutter analyze
+
+      - name: Check formatting
+        working-directory: hivork-app
+        run: dart format --set-exit-if-changed .
+
+      - name: Run tests
+        working-directory: hivork-app
+        run: flutter test --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: hivork-app/coverage/lcov.info
+          flags: flutter
+
+  build-android:
+    name: Build Android APK
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.0'
+          channel: 'stable'
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Get dependencies
+        working-directory: hivork-app
+        run: flutter pub get
+
+      - name: Build APK
+        working-directory: hivork-app
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release.apk
+          path: hivork-app/build/app/outputs/flutter-apk/app-release.apk
+
+  build-ios:
+    name: Build iOS IPA
+    needs: test
+    runs-on: macos-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.0'
+          channel: 'stable'
+
+      - name: Get dependencies
+        working-directory: hivork-app
+        run: flutter pub get
+
+      - name: Build iOS
+        working-directory: hivork-app
+        run: flutter build ios --release --no-codesign
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios-build
+          path: hivork-app/build/ios/iphoneos/Runner.app

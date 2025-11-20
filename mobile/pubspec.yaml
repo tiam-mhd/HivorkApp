@@ -1,0 +1,94 @@
+name: hivork_app
+description: "Hivork Business Management System - Mobile App"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UI
+  cupertino_icons: ^1.0.8
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
+  
+  # State Management
+  flutter_bloc: ^8.1.6
+  equatable: ^2.0.5
+  
+  # HTTP & API
+  dio: ^5.7.0
+  retrofit: ^4.4.1
+  json_annotation: ^4.9.0
+  
+  # Storage
+  shared_preferences: ^2.3.2
+  flutter_secure_storage: ^9.2.2
+  
+  # Dependency Injection
+  get_it: ^8.0.2
+  injectable: ^2.5.0
+  
+  # UI Components
+  flutter_svg: ^2.0.10+1
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+  
+  # Forms & Validation
+  formz: ^0.7.0
+  
+  # Date & Time
+  persian_datetime_picker: ^2.7.0
+  shamsi_date: ^1.1.0
+  
+  # Charts
+  fl_chart: ^0.69.2
+  
+  # Navigation
+  go_router: ^14.6.2
+  
+  # Utils
+  logger: ^2.5.0
+  dartz: ^0.10.1
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  flutter_lints: ^5.0.0
+  
+  # Code Generation
+  build_runner: ^2.4.13
+  json_serializable: ^6.8.0
+  retrofit_generator: ^9.1.4
+  injectable_generator: ^2.6.2
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+  uses-material-design: true
+  
+  # Assets
+  assets:
+    - assets/images/
+    - assets/images/branding/
+    - assets/icons/
+    - assets/fonts/
+  
+  # Fonts
+  fonts:
+    - family: Vazirmatn
+      fonts:
+        - asset: assets/fonts/Vazirmatn-Regular.ttf
+        - asset: assets/fonts/Vazirmatn-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Vazirmatn-Bold.ttf
+          weight: 700

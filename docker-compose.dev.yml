@@ -1,0 +1,76 @@
+version: '3.8'
+
+# Development Environment with Hot Reload
+services:
+  # Backend API (NestJS)
+  backend:
+    build:
+      context: ./hivork-backend
+      dockerfile: Dockerfile.dev
+    container_name: hivork-backend-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "9229:9229" # Debug port
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://hivork:hivork_secret_pass_2024@postgres:5432/hivork_db
+      REDIS_URL: redis://:hivork_redis_pass_2024@redis:6379
+      JWT_SECRET: your-jwt-secret-key-change-in-production
+      JWT_REFRESH_SECRET: your-refresh-secret-key-change-in-production
+    volumes:
+      - ./hivork-backend:/app
+      - /app/node_modules
+    networks:
+      - hivork-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: npm run start:dev
+
+  # Admin Dashboard (Angular)
+  admin:
+    build:
+      context: ./hivork-admin
+      dockerfile: Dockerfile.dev
+    container_name: hivork-admin-dev
+    restart: unless-stopped
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./hivork-admin:/app
+      - /app/node_modules
+    networks:
+      - hivork-network
+    command: npm start
+
+  postgres:
+    extends:
+      file: docker-compose.yml
+      service: postgres
+
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+
+  pgadmin:
+    extends:
+      file: docker-compose.yml
+      service: pgadmin
+
+  redis-commander:
+    extends:
+      file: docker-compose.yml
+      service: redis-commander
+
+volumes:
+  postgres_data:
+  redis_data:
+  pgadmin_data:
+
+networks:
+  hivork-network:
+    driver: bridge

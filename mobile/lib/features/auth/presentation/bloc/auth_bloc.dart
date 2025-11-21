@@ -55,32 +55,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onCheckAuthStatus(
     CheckAuthStatusEvent event,
     Emitter<AuthState> emit,
-  ) async {
-    print('🔍 [AUTH_BLOC] Checking auth status...');
-    
+  ) async {    
     final result = await isLoggedInUseCase();
     
     await result.fold(
       (failure) async {
-        print('❌ [AUTH_BLOC] Not logged in');
         emit(AuthUnauthenticated());
       },
       (isLoggedIn) async {
         if (isLoggedIn) {
-          print('✅ [AUTH_BLOC] User is logged in, fetching profile...');
           final profileResult = await getProfileUseCase();
           profileResult.fold(
             (failure) {
-              print('❌ [AUTH_BLOC] Failed to fetch profile');
               emit(AuthUnauthenticated());
             },
             (user) {
-              print('✅ [AUTH_BLOC] Profile fetched: ${user.phone}');
               emit(AuthAuthenticated(user));
             },
           );
         } else {
-          print('❌ [AUTH_BLOC] No token found');
           emit(AuthUnauthenticated());
         }
       },

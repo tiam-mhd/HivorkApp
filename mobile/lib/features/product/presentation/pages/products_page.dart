@@ -14,6 +14,9 @@ import '../widgets/product_list_item.dart';
 import 'product_form_page.dart';
 import 'product_detail_page.dart';
 import 'categories_management_page.dart';
+import 'attributes_management_page.dart';
+import 'stock_report_screen.dart';
+import 'package:go_router/go_router.dart';
 
 enum ViewMode { list, grid }
 
@@ -761,6 +764,22 @@ class _ProductsPageState extends State<ProductsPage> {
             ),
           ),
           actions: [
+            // دکمه گزارش موجودی
+            IconButton(
+              icon: Icon(Icons.bar_chart_rounded, color: theme.colorScheme.onSurface),
+              onPressed: () {
+                context.push('/stock-report?businessId=${widget.businessId}');
+              },
+              tooltip: 'گزارش موجودی',
+            ),
+            // دکمه مدیریت ویژگی‌ها
+            IconButton(
+              icon: Icon(Icons.tune, color: theme.colorScheme.onSurface),
+              onPressed: () {
+                context.push('/attributes?businessId=${widget.businessId}');
+              },
+              tooltip: 'مدیریت ویژگی‌ها',
+            ),
             // دکمه دسته‌بندی
             IconButton(
               icon: Icon(Icons.category_outlined, color: theme.colorScheme.onSurface),

@@ -19,14 +19,11 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, Map<String, dynamic>>> sendOtp(String phone) async {
     try {
-      print('🔵 [SEND_OTP] Request: $phone');
       final response = await apiService.sendOtp({'phone': phone});
-      print('🟢 [SEND_OTP] Response: ${response.data}');
       
       if (response.response.statusCode == 200) {
         // Backend: {success, data: {exists, message}, message, meta}
         final data = response.data['data'] as Map<String, dynamic>;
-        print('✅ [SEND_OTP] Result: $data');
         return Right(data);
       } else {
         return Left(ServerFailure(
@@ -35,10 +32,8 @@ class AuthRepositoryImpl implements AuthRepository {
         ));
       }
     } on DioException catch (e) {
-      print('❌ [SEND_OTP] Error: ${e.response?.data}');
       return Left(_handleDioError(e));
     } catch (e) {
-      print('💥 [CHECK_PHONE] Exception: $e');
       return Left(ServerFailure(message: 'خطای غیرمنتظره: ${e.toString()}'));
     }
   }
@@ -58,14 +53,12 @@ class AuthRepositoryImpl implements AuthRepository {
         if (email != null && email.isNotEmpty) 'email': email,
       });
 
-      print('🟢 [REGISTER] Response: ${response.data}');
       
       if (response.response.statusCode == 201) {
         // Backend: {success, data: {user, tokens}, message, meta}
         final data = response.data['data'] as Map<String, dynamic>;
         final authResponse = AuthResponseModel.fromJson(data);
         
-        print('✅ [REGISTER] Caching tokens...');
         await localDataSource.cacheTokens(
           authResponse.tokens.accessToken,
           authResponse.tokens.refreshToken,
@@ -92,20 +85,16 @@ class AuthRepositoryImpl implements AuthRepository {
     required String password,
   }) async {
     try {
-      print('🔵 [LOGIN] Request: $phone');
       final response = await apiService.login({
         'phone': phone,
         'password': password,
       });
-
-      print('🟢 [LOGIN] Response: ${response.data}');
       
       if (response.response.statusCode == 200) {
         // Backend: {success, data: {user, tokens}, message, meta}
         final data = response.data['data'] as Map<String, dynamic>;
         final authResponse = AuthResponseModel.fromJson(data);
         
-        print('✅ [LOGIN] Caching tokens...');
         await localDataSource.cacheTokens(
           authResponse.tokens.accessToken,
           authResponse.tokens.refreshToken,
@@ -120,10 +109,8 @@ class AuthRepositoryImpl implements AuthRepository {
         ));
       }
     } on DioException catch (e) {
-      print('❌ [LOGIN] Error: ${e.response?.data}');
       return Left(_handleDioError(e));
     } catch (e) {
-      print('💥 [LOGIN] Exception: $e');
       return Left(ServerFailure(message: 'خطای غیرمنتظره: ${e.toString()}'));
     }
   }
@@ -134,13 +121,10 @@ class AuthRepositoryImpl implements AuthRepository {
     required String verificationCode,
   }) async {
     try {
-      print('🔵 [VERIFY] Request: $phone');
       final response = await apiService.verifyPhone({
         'phone': phone,
         'code': verificationCode,
       });
-
-      print('🟢 [VERIFY] Response: ${response.data}');
       
       if (response.response.statusCode == 200) {
         // Backend: {success, data: {success, message, user, exists}, message, meta}
@@ -149,7 +133,6 @@ class AuthRepositoryImpl implements AuthRepository {
         final user = UserModel.fromJson(userData);
         final exists = data['exists'] as bool;
         
-        print('✅ [VERIFY] User verified. Exists: $exists');
         await localDataSource.cacheUser(user);
 
         return Right({
@@ -181,15 +164,12 @@ class AuthRepositoryImpl implements AuthRepository {
       final response = await apiService.refreshToken({
         'refreshToken': refreshToken,
       });
-
-      print('🟢 [REFRESH_TOKEN] Response: ${response.data}');
       
       if (response.response.statusCode == 200) {
         // Backend: {success, data: {tokens}, message, meta}
         final data = response.data['data'] as Map<String, dynamic>;
         final tokens = AuthTokensModel.fromJson(data);
         
-        print('✅ [REFRESH_TOKEN] Caching new tokens...');
         await localDataSource.cacheTokens(
           tokens.accessToken,
           tokens.refreshToken,
@@ -255,15 +235,12 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, User>> getProfile() async {
     try {
       final response = await apiService.getProfile();
-
-      print('🟢 [PROFILE] Response: ${response.data}');
       
       if (response.response.statusCode == 200) {
         // Backend: {success, data: {user}, message, meta}
         final data = response.data['data'] as Map<String, dynamic>;
         final user = UserModel.fromJson(data);
         
-        print('✅ [PROFILE] Updating cached user...');
         await localDataSource.cacheUser(user);
 
         return Right(user);

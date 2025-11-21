@@ -7,6 +7,7 @@ import '../../data/services/product_api_service.dart';
 import '../../data/services/category_api_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../bloc/product_bloc.dart';
+import '../widgets/product_variants_tab.dart';
 
 class ProductFormPage extends StatefulWidget {
   final String businessId;
@@ -22,9 +23,10 @@ class ProductFormPage extends StatefulWidget {
   State<ProductFormPage> createState() => _ProductFormPageState();
 }
 
-class _ProductFormPageState extends State<ProductFormPage> {
+class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   late ProductBloc _productBloc;
+  late TabController _tabController;
 
   // Controllers
   final _codeController = TextEditingController();
@@ -56,10 +58,14 @@ class _ProductFormPageState extends State<ProductFormPage> {
   ProductCategory? _selectedCategory;
   List<ProductCategory> _categories = [];
   bool _loadingCategories = true;
+  
+  // Variants
+  bool _hasVariants = false;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     final dio = ServiceLocator().dio;
     _productBloc = ProductBloc(ProductRepository(ProductApiService(dio)));
     _loadCategories();
@@ -116,6 +122,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
     _selectedUnit = product.unit;
     _selectedStatus = product.status;
     _trackInventory = product.trackInventory;
+    _hasVariants = product.hasVariants ?? false;
     
     // Set selected category if exists and categories are loaded
     if (product.category != null && _categories.isNotEmpty) {
@@ -132,6 +139,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     _codeController.dispose();
     _nameController.dispose();
     _nameEnController.dispose();
@@ -183,6 +191,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
           ? double.parse(_reorderPointController.text)
           : null,
       'trackInventory': _trackInventory,
+      'hasVariants': _hasVariants,
       'sku': _skuController.text.isNotEmpty ? _skuController.text : null,
       'supplier': _supplierController.text.isNotEmpty ? _supplierController.text : null,
       'weight': _weightController.text.isNotEmpty
@@ -301,14 +310,28 @@ class _ProductFormPageState extends State<ProductFormPage> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+            bottom: TabBar(
+              controller: _tabController,
+              labelColor: theme.colorScheme.primary,
+              unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.6),
+              indicatorColor: theme.colorScheme.primary,
+              tabs: const [
+                Tab(text: 'اطلاعات پایه', icon: Icon(Icons.info_outline, size: 20)),
+                Tab(text: 'تنوع محصول', icon: Icon(Icons.playlist_add, size: 20)),
+              ],
+            ),
           ),
           body: BlocBuilder<ProductBloc, ProductState>(
             builder: (context, state) {
               final isLoading = state is ProductLoading;
 
-              return Form(
-                key: _formKey,
-                child: ListView(
+              return TabBarView(
+                controller: _tabController,
+                children: [
+                  // Tab 1: اطلاعات پایه
+                  Form(
+                    key: _formKey,
+                    child: ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
                     // Basic Info Section
@@ -513,6 +536,16 @@ class _ProductFormPageState extends State<ProductFormPage> {
                     _buildSectionTitle('موجودی', theme),
                     const SizedBox(height: 16),
                     SwitchListTile(
+                      title: Text('این محصول دارای تنوع است'),
+                      subtitle: Text('محصولات با تنوع دارای رنگ، سایز یا سایر ویژگی‌ها هستند'),
+                      value: _hasVariants,
+                      onChanged: isLoading ? null : (value) {
+                        setState(() => _hasVariants = value);
+                      },
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
                       title: Text('ردیابی موجودی'),
                       value: _trackInventory,
                       onChanged: isLoading ? null : (value) {
@@ -644,7 +677,51 @@ class _ProductFormPageState extends State<ProductFormPage> {
                     ),
                     const SizedBox(height: 20),
                   ],
-                ),
+                    ),
+                  ),
+                  
+                  // Tab 2: تنوع محصول
+                  widget.product?.id == null
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 64,
+                                  color: theme.colorScheme.outline,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'ابتدا محصول را ذخیره کنید',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    color: theme.colorScheme.outline,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'بعد از ذخیره محصول، می‌توانید تنوع‌ها را مدیریت کنید',
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.outline,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ProductVariantsTab(
+                          productId: widget.product!.id,
+                          productName: _nameController.text.isNotEmpty ? _nameController.text : (widget.product?.name ?? 'محصول'),
+                          businessId: widget.businessId,
+                          hasVariants: _hasVariants,
+                          onHasVariantsChanged: (value) {
+                            setState(() => _hasVariants = value);
+                          },
+                        ),
+                ],
               );
             },
           ),

@@ -147,4 +147,63 @@ class AppColors {
   static const Color darkWarning = Color(0xFFFBBF24);
   static const Color darkError = Color(0xFFF87171);
   static const Color darkInfo = Color(0xFF7AADCE);
+  
+  // ============================================
+  // ATTRIBUTE & VARIANT SPECIFIC COLORS
+  // For Product Attributes & Variants System
+  // ============================================
+  
+  // Attribute Type Colors - Light Mode
+  static const Color attributeText = Color(0xFF6366F1); // Indigo for text
+  static const Color attributeNumber = Color(0xFF10B981); // Green for number
+  static const Color attributeSelect = Color(0xFF8B5CF6); // Purple for select
+  static const Color attributeColor = Color(0xFFEC4899); // Pink for color
+  static const Color attributeBoolean = Color(0xFF06B6D4); // Cyan for boolean
+  static const Color attributeDate = Color(0xFFF59E0B); // Amber for date
+  
+  // Attribute Type Colors - Dark Mode
+  static const Color darkAttributeText = Color(0xFF818CF8);
+  static const Color darkAttributeNumber = Color(0xFF34D399);
+  static const Color darkAttributeSelect = Color(0xFFA78BFA);
+  static const Color darkAttributeColor = Color(0xFFF472B6);
+  static const Color darkAttributeBoolean = Color(0xFF22D3EE);
+  static const Color darkAttributeDate = Color(0xFFFBBF24);
+  
+  // Variant Status Colors - Light Mode
+  static const Color variantActive = Color(0xFF10B981); // Green
+  static const Color variantLowStock = Color(0xFFF59E0B); // Amber
+  static const Color variantOutOfStock = Color(0xFFDC2626); // Red
+  static const Color variantInactive = Color(0xFF6B7280); // Gray
+  
+  // Variant Status Colors - Dark Mode
+  static const Color darkVariantActive = Color(0xFF34D399);
+  static const Color darkVariantLowStock = Color(0xFFFBBF24);
+  static const Color darkVariantOutOfStock = Color(0xFFF87171);
+  static const Color darkVariantInactive = Color(0xFF9CA3AF);
+  
+  // Attribute Scope Colors - Light Mode
+  static const Color scopeFixed = Color(0xFF2D5F8D); // Secondary blue for fixed
+  static const Color scopeVariable = Color(0xFFF47A20); // Primary orange for variable
+  
+  // Attribute Scope Colors - Dark Mode
+  static const Color darkScopeFixed = Color(0xFF5B8DB8);
+  static const Color darkScopeVariable = Color(0xFFFF9E5C);
+  
+  // Cardinality Colors - Light Mode
+  static const Color cardinalitySingle = Color(0xFF6366F1); // Indigo
+  static const Color cardinalityMultiple = Color(0xFF8B5CF6); // Purple
+  
+  // Cardinality Colors - Dark Mode
+  static const Color darkCardinalitySingle = Color(0xFF818CF8);
+  static const Color darkCardinalityMultiple = Color(0xFFA78BFA);
+  
+  // Stock Level Backgrounds - Light Mode
+  static const Color stockHighBg = Color(0xFFD1FAE5); // Light green
+  static const Color stockMediumBg = Color(0xFFFEF3C7); // Light amber
+  static const Color stockLowBg = Color(0xFFFEE2E2); // Light red
+  
+  // Stock Level Backgrounds - Dark Mode
+  static const Color darkStockHighBg = Color(0xFF064E3B);
+  static const Color darkStockMediumBg = Color(0xFF78350F);
+  static const Color darkStockLowBg = Color(0xFF7F1D1D);
 }

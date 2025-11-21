@@ -22,19 +22,13 @@ class DioClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           // Add access token to headers
-          final token = await _storage.read(key: AppConstants.accessTokenKey);
-          print('🔐 [DioClient] Reading token for ${options.method} ${options.path}');
-          print('   Token: ${token != null ? "Found (${token.substring(0, 20)}...)" : "NULL ❌"}');
-          
+          final token = await _storage.read(key: AppConstants.accessTokenKey);          
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
-            print('✅ [DioClient] Authorization header added');
           } else {
-            print('⚠️ [DioClient] No token found - request will be unauthorized');
           }
           
           // نمایش تمام headers
-          print('📋 [DioClient] Request Headers: ${options.headers}');
           
           return handler.next(options);
         },

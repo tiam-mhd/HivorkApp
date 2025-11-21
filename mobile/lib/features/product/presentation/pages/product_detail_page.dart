@@ -3,10 +3,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart' as intl;
 import '../../../../core/di/service_locator.dart';
 import '../../data/models/product.dart';
+import '../../data/models/product_variant.dart';
+import '../../data/models/attribute_enums.dart';
 import '../../data/repositories/product_repository.dart';
 import '../../data/services/product_api_service.dart';
+import '../../data/services/variant_api_service.dart';
 import '../bloc/product_bloc.dart';
 import 'product_form_page.dart';
+import 'variants_management_page.dart';
 
 class ProductDetailPage extends StatefulWidget {
   final String productId;
@@ -22,12 +26,16 @@ class ProductDetailPage extends StatefulWidget {
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
   late ProductBloc _productBloc;
+  late VariantApiService _variantService;
+  List<ProductVariant> _variants = [];
+  bool _isLoadingVariants = false;
 
   @override
   void initState() {
     super.initState();
     final dio = ServiceLocator().dio;
     _productBloc = ProductBloc(ProductRepository(ProductApiService(dio)));
+    _variantService = VariantApiService(dio);
     _productBloc.add(LoadProductById(widget.productId));
   }
 
@@ -35,6 +43,46 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   void dispose() {
     _productBloc.close();
     super.dispose();
+  }
+
+  Future<void> _loadVariants() async {
+    setState(() {
+      _isLoadingVariants = true;
+    });
+
+    try {
+      final result = await _variantService.getVariants(productId: widget.productId);
+      final variantsList = result['data'] as List<ProductVariant>;
+      
+      // Sort: in-stock first
+      variantsList.sort((a, b) {
+        final aOrder = _getVariantStatusOrder(a.status);
+        final bOrder = _getVariantStatusOrder(b.status);
+        return aOrder.compareTo(bOrder);
+      });
+
+      setState(() {
+        _variants = variantsList;
+        _isLoadingVariants = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingVariants = false;
+      });
+    }
+  }
+
+  int _getVariantStatusOrder(VariantStatus status) {
+    switch (status) {
+      case VariantStatus.inStock:
+        return 0;
+      case VariantStatus.lowStock:
+        return 1;
+      case VariantStatus.outOfStock:
+        return 2;
+      case VariantStatus.discontinued:
+        return 3;
+    }
   }
 
   String _getUnitLabel(ProductUnit unit) {
@@ -533,123 +581,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                           const SizedBox(height: 24),
 
                           // Stock Section
-                          Container(
-                            padding: EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: theme.cardColor,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 8,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.inventory_outlined, size: 20, color: theme.colorScheme.primary),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'موجودی انبار',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Spacer(),
-                                    TextButton.icon(
-                                      onPressed: () => _showStockAdjustDialog(product),
-                                      icon: Icon(Icons.edit, size: 16),
-                                      label: Text('تنظیم'),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'موجودی فعلی',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: theme.colorScheme.onSurface.withOpacity(0.6),
-                                            ),
-                                          ),
-                                          SizedBox(height: 4),
-                                          Text(
-                                            '${numberFormat.format(product.currentStock)} ${_getUnitLabel(product.unit)}',
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                              color: product.isOutOfStock
-                                                  ? Colors.red
-                                                  : product.isLowStock
-                                                      ? Colors.orange
-                                                      : theme.colorScheme.onSurface,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'حداقل موجودی',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: theme.colorScheme.onSurface.withOpacity(0.6),
-                                            ),
-                                          ),
-                                          SizedBox(height: 4),
-                                          Text(
-                                            '${numberFormat.format(product.minStock)} ${_getUnitLabel(product.unit)}',
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (product.isLowStock && !product.isOutOfStock)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 12),
-                                    child: Container(
-                                      padding: EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.orange.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
-                                          SizedBox(width: 8),
-                                          Text(
-                                            'موجودی این محصول کم است',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.orange,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
+                          _buildStockSection(product, theme, numberFormat),
 
                           const SizedBox(height: 24),
                         ],
@@ -735,6 +667,413 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       return Color(int.parse(hexColor, radix: 16));
     } catch (e) {
       return Colors.blue;
+    }
+  }
+
+  Widget _buildStockSection(Product product, ThemeData theme, intl.NumberFormat numberFormat) {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.inventory_outlined, size: 20, color: theme.colorScheme.primary),
+              SizedBox(width: 8),
+              Text(
+                'موجودی انبار',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Spacer(),
+              if (product.hasVariants)
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => VariantsManagementPage(
+                          productId: product.id,
+                          productName: product.name,
+                          businessId: product.businessId,
+                        ),
+                      ),
+                    ).then((_) => _loadVariants());
+                  },
+                  icon: Icon(Icons.auto_awesome_mosaic, size: 16),
+                  label: Text('مدیریت تنوع‌ها'),
+                )
+              else
+                TextButton.icon(
+                  onPressed: () => _showStockAdjustDialog(product),
+                  icon: Icon(Icons.edit, size: 16),
+                  label: Text('تنظیم'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          if (product.hasVariants)
+            _buildVariantStocks(product, theme, numberFormat)
+          else
+            _buildSimpleStock(product, theme, numberFormat),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimpleStock(Product product, ThemeData theme, intl.NumberFormat numberFormat) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'موجودی فعلی',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '${numberFormat.format(product.currentStock)} ${_getUnitLabel(product.unit)}',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: product.isOutOfStock
+                          ? Colors.red
+                          : product.isLowStock
+                              ? Colors.orange
+                              : theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'حداقل موجودی',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '${numberFormat.format(product.minStock)} ${_getUnitLabel(product.unit)}',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (product.isLowStock && !product.isOutOfStock)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'موجودی این محصول کم است',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildVariantStocks(Product product, ThemeData theme, intl.NumberFormat numberFormat) {
+    if (_variants.isEmpty && !_isLoadingVariants) {
+      // Load variants on first render
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadVariants();
+      });
+    }
+
+    if (_isLoadingVariants) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_variants.isEmpty) {
+      return Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: theme.colorScheme.onSurfaceVariant, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'هنوز تنوعی ایجاد نشده است',
+              style: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final isDark = theme.brightness == Brightness.dark;
+    
+    // Show up to 5 variants
+    final displayVariants = _variants.take(5).toList();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Mini summary
+        Row(
+          children: [
+            _buildMiniStatBadge(
+              'موجود',
+              _variants.where((v) => v.status == VariantStatus.inStock).length,
+              isDark ? Colors.green.shade300 : Colors.green.shade600,
+              isDark,
+            ),
+            SizedBox(width: 8),
+            _buildMiniStatBadge(
+              'کم',
+              _variants.where((v) => v.status == VariantStatus.lowStock).length,
+              isDark ? Colors.orange.shade300 : Colors.orange.shade600,
+              isDark,
+            ),
+            SizedBox(width: 8),
+            _buildMiniStatBadge(
+              'ناموجود',
+              _variants.where((v) => v.status == VariantStatus.outOfStock).length,
+              isDark ? Colors.red.shade300 : Colors.red.shade600,
+              isDark,
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        
+        // Variant list
+        ...displayVariants.map((variant) => _buildVariantStockRow(variant, theme, numberFormat, isDark)),
+        
+        if (_variants.length > 5)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VariantsManagementPage(
+                      productId: product.id,
+                      productName: product.name,
+                      businessId: product.businessId,
+                    ),
+                  ),
+                ).then((_) => _loadVariants());
+              },
+              child: Text('مشاهده ${_variants.length - 5} تنوع دیگر'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMiniStatBadge(String label, int count, Color color, bool isDark) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? color.withOpacity(0.2) : color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            count.toString(),
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+          SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVariantStockRow(ProductVariant variant, ThemeData theme, intl.NumberFormat numberFormat, bool isDark) {
+    final colors = _extractColorCodes(variant);
+    
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark 
+            ? theme.cardColor.withOpacity(0.3) 
+            : theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isDark 
+              ? Colors.grey.shade700.withOpacity(0.3)
+              : Colors.grey.shade200,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Color indicator
+          if (colors.isNotEmpty)
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: _parseVariantColor(colors.first),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+                  width: 1.5,
+                ),
+              ),
+            )
+          else
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                shape: BoxShape.circle,
+              ),
+            ),
+          SizedBox(width: 12),
+          
+          // Name
+          Expanded(
+            child: Text(
+              _formatVariantName(variant.name ?? variant.sku),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          
+          // Stock
+          Text(
+            '${numberFormat.format(variant.currentStock)}',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: _getVariantStatusColor(variant.status, isDark),
+            ),
+          ),
+          SizedBox(width: 4),
+          Text(
+            'عدد',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<String> _extractColorCodes(ProductVariant variant) {
+    final colors = <String>{};
+    
+    variant.attributes.forEach((key, value) {
+      if (key.toLowerCase() == 'color' || key == 'رنگ') {
+        if (value is List) {
+          for (final item in value) {
+            final str = item.toString();
+            if (str.startsWith('#') && str.length == 7) {
+              colors.add(str.toLowerCase());
+            }
+          }
+        } else {
+          final str = value.toString();
+          if (str.startsWith('#') && str.length == 7) {
+            colors.add(str.toLowerCase());
+          }
+        }
+      }
+    });
+    
+    return colors.toList();
+  }
+
+  Color _parseVariantColor(String colorCode) {
+    try {
+      return Color(int.parse(colorCode.substring(1), radix: 16) + 0xFF000000);
+    } catch (e) {
+      return Colors.grey;
+    }
+  }
+
+  String _formatVariantName(String name) {
+    return name.replaceAll(RegExp(r'#[0-9a-fA-F]{6}'), '').trim();
+  }
+
+  Color _getVariantStatusColor(VariantStatus status, bool isDark) {
+    switch (status) {
+      case VariantStatus.inStock:
+        return isDark ? Colors.green.shade300 : Colors.green.shade600;
+      case VariantStatus.lowStock:
+        return isDark ? Colors.orange.shade300 : Colors.orange.shade600;
+      case VariantStatus.outOfStock:
+        return isDark ? Colors.red.shade300 : Colors.red.shade600;
+      case VariantStatus.discontinued:
+        return isDark ? Colors.grey.shade400 : Colors.grey.shade600;
     }
   }
 }

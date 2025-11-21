@@ -31,6 +31,9 @@ import 'features/business/presentation/pages/create_business_page.dart';
 import 'features/product/presentation/pages/products_page.dart';
 import 'features/product/presentation/pages/product_form_page.dart';
 import 'features/product/presentation/pages/product_detail_page.dart';
+import 'features/product/presentation/pages/attributes_management_page.dart';
+import 'features/product/presentation/pages/variants_management_page.dart';
+import 'features/product/presentation/pages/stock_report_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -308,6 +311,33 @@ class _HivorkAppState extends State<HivorkApp> {
           builder: (context, state) {
             final productId = state.pathParameters['id'] ?? '';
             return ProductDetailPage(productId: productId);
+          },
+        ),
+        GoRoute(
+          path: '/attributes',
+          builder: (context, state) {
+            final businessId = state.uri.queryParameters['businessId'] ?? '';
+            return AttributesManagementPage(businessId: businessId);
+          },
+        ),
+        GoRoute(
+          path: '/variants',
+          builder: (context, state) {
+            final productId = state.uri.queryParameters['productId'] ?? '';
+            final productName = state.uri.queryParameters['productName'] ?? 'محصول';
+            final businessId = state.uri.queryParameters['businessId'] ?? '';
+            return VariantsManagementPage(
+              productId: productId,
+              productName: productName,
+              businessId: businessId,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/stock-report',
+          builder: (context, state) {
+            final businessId = state.uri.queryParameters['businessId'] ?? '';
+            return StockReportScreen(businessId: businessId);
           },
         ),
       ],

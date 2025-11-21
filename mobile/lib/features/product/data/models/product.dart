@@ -151,6 +151,13 @@ class Product {
   final double? reorderPoint;
   @JsonKey(name: 'trackInventory', defaultValue: true)
   final bool trackInventory;
+  
+  // Variants
+  @JsonKey(name: 'hasVariants', defaultValue: false)
+  final bool hasVariants;
+  @NullableStringToDoubleConverter()
+  @JsonKey(name: 'totalStock')
+  final double? totalStock;
 
   // Images
   @JsonKey(name: 'mainImage')
@@ -202,6 +209,8 @@ class Product {
     this.maxStock,
     this.reorderPoint,
     required this.trackInventory,
+    required this.hasVariants,
+    this.totalStock,
     this.mainImage,
     this.images,
     this.supplier,
@@ -245,6 +254,8 @@ class Product {
     double? maxStock,
     double? reorderPoint,
     bool? trackInventory,
+    bool? hasVariants,
+    double? totalStock,
     String? mainImage,
     List<String>? images,
     String? supplier,
@@ -282,6 +293,8 @@ class Product {
       maxStock: maxStock ?? this.maxStock,
       reorderPoint: reorderPoint ?? this.reorderPoint,
       trackInventory: trackInventory ?? this.trackInventory,
+      hasVariants: hasVariants ?? this.hasVariants,
+      totalStock: totalStock ?? this.totalStock,
       mainImage: mainImage ?? this.mainImage,
       images: images ?? this.images,
       supplier: supplier ?? this.supplier,

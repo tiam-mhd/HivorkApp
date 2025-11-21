@@ -710,6 +710,256 @@ class ProductApiService {
 
 ---
 
+## 🆕 Product Attributes & Variants (تازه اضافه شده)
+
+### Endpoints جدید برای Attributes
+
+#### 1. Create Attribute
+```
+POST /api/products/attributes
+```
+
+**Request Body:**
+```json
+{
+  "name": "سایز",
+  "nameEn": "Size",
+  "code": "size",
+  "dataType": "select",
+  "cardinality": "single",
+  "scope": "variant_level",
+  "options": [
+    { "value": "S", "label": "Small", "sortOrder": 1 },
+    { "value": "M", "label": "Medium", "sortOrder": 2 },
+    { "value": "L", "label": "Large", "sortOrder": 3 }
+  ],
+  "required": true,
+  "isActive": true
+}
+```
+
+#### 2. Get All Attributes
+```
+GET /api/products/attributes?scope=variant_level&isActive=true
+```
+
+#### 3. Get Attribute by ID
+```
+GET /api/products/attributes/:id
+```
+
+#### 4. Update Attribute
+```
+PUT /api/products/attributes/:id
+```
+
+#### 5. Delete Attribute
+```
+DELETE /api/products/attributes/:id
+```
+
+#### 6. Toggle Attribute Status
+```
+PATCH /api/products/attributes/:id/toggle
+```
+
+### Endpoints جدید برای Variants
+
+#### 1. Create Variant
+```
+POST /api/products/:productId/variants
+```
+
+**Request Body:**
+```json
+{
+  "sku": "TSH-L-BLU",
+  "name": "تی‌شرت سایز L آبی",
+  "attributes": {
+    "size": "L",
+    "color": "#0000FF"
+  },
+  "currentStock": 10,
+  "minStock": 2,
+  "salePrice": 160000
+}
+```
+
+#### 2. Bulk Create Variants
+```
+POST /api/products/:productId/variants/bulk
+```
+
+**Request Body:**
+```json
+{
+  "variants": [
+    {
+      "sku": "TSH-S-BLU",
+      "attributes": { "size": "S", "color": "#0000FF" },
+      "currentStock": 5,
+      "salePrice": 150000
+    },
+    {
+      "sku": "TSH-M-BLU",
+      "attributes": { "size": "M", "color": "#0000FF" },
+      "currentStock": 10,
+      "salePrice": 150000
+    }
+  ]
+}
+```
+
+#### 3. Get Product Variants
+```
+GET /api/products/:productId/variants
+```
+
+#### 4. Get Variant by ID
+```
+GET /api/products/:productId/variants/:variantId
+```
+
+#### 5. Update Variant
+```
+PUT /api/products/:productId/variants/:variantId
+```
+
+#### 6. Update Variant Stock
+```
+PATCH /api/products/:productId/variants/:variantId/stock
+```
+
+**Request Body:**
+```json
+{
+  "currentStock": 15,
+  "notes": "دریافت از انبار"
+}
+```
+
+#### 7. Delete Variant
+```
+DELETE /api/products/:productId/variants/:variantId
+```
+
+#### 8. Get Low Stock Variants
+```
+GET /api/variants/low-stock
+```
+
+#### 9. Get Out of Stock Variants
+```
+GET /api/variants/out-of-stock
+```
+
+### Enums جدید
+
+#### AttributeDataType
+```typescript
+enum AttributeDataType {
+  TEXT = 'text',
+  NUMBER = 'number',
+  SELECT = 'select',
+  COLOR = 'color',
+  BOOLEAN = 'boolean',
+  DATE = 'date',
+}
+```
+
+#### AttributeCardinality
+```typescript
+enum AttributeCardinality {
+  SINGLE = 'single',      // تک مقداره
+  MULTIPLE = 'multiple',  // چند مقداره
+}
+```
+
+#### AttributeScope
+```typescript
+enum AttributeScope {
+  PRODUCT_LEVEL = 'product_level',    // ثابت در سطح محصول
+  VARIANT_LEVEL = 'variant_level',    // متغیر در Variants
+}
+```
+
+#### VariantStatus
+```typescript
+enum VariantStatus {
+  IN_STOCK = 'in_stock',
+  LOW_STOCK = 'low_stock',
+  OUT_OF_STOCK = 'out_of_stock',
+  DISCONTINUED = 'discontinued',
+}
+```
+
+### تغییرات در Product Entity
+
+```typescript
+interface Product {
+  // ... تمام فیلدهای قبلی ...
+  
+  // ✨ فیلدهای جدید:
+  hasVariants: boolean;           // آیا این محصول Variant دارد؟
+  totalStock: number;             // موجودی کل (محاسبه‌ای از Variants)
+  variants: ProductVariant[];     // لیست Variants
+  attributeValues: ProductAttributeValue[]; // ویژگی‌های ثابت محصول
+}
+```
+
+### ProductVariant Entity
+
+```typescript
+interface ProductVariant {
+  id: string;
+  productId: string;
+  businessId: string;
+  sku: string;                    // یونیک
+  barcode?: string;
+  name?: string;
+  attributes: Record<string, any>; // ویژگی‌های متغیر
+  currentStock: number;            // موجودی مستقل
+  minStock: number;
+  reorderPoint?: number;
+  priceAdjustment: number;         // تفاوت قیمت با محصول اصلی
+  salePrice?: number;              // یا قیمت مطلق
+  purchasePrice?: number;
+  mainImage?: string;
+  images?: string[];
+  weight?: number;
+  dimensions?: {
+    length?: number;
+    width?: number;
+    height?: number;
+    unit?: string;
+  };
+  isActive: boolean;
+  status: VariantStatus;
+  sortOrder: number;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### تغییرات در InvoiceItem Entity
+
+```typescript
+interface InvoiceItem {
+  // ... تمام فیلدهای قبلی ...
+  
+  // ✨ فیلدهای جدید:
+  variantId?: string;              // شناسه Variant انتخاب شده
+  variantSnapshot?: {              // Snapshot ویژگی‌ها در زمان فروش
+    sku: string;
+    attributes: Record<string, any>;
+    name?: string;
+  };
+}
+```
+
+---
+
 ## 🔗 لینک‌های مرتبط
 
 - [Common Types](./common-types.md) - تایپ‌های مشترک
@@ -720,5 +970,5 @@ class ProductApiService {
 
 ---
 
-**آخرین به‌روزرسانی**: 2024-01-16  
-**وضعیت**: ✅ کامل و همگام با کد
+**آخرین به‌روزرسانی**: 2025-11-20  
+**وضعیت**: ✅ کامل و همگام با کد - شامل Attributes & Variants

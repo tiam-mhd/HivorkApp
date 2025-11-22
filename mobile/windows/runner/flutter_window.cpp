@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "theme_channel.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -25,7 +26,15 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  
+  // Register theme channel
+  ThemeChannel::RegisterWithRegistrar(
+      flutter_controller_->engine()->GetRegistrarForPlugin("ThemeChannel"));
+  
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
+
+  // Update window theme to match system theme
+  UpdateTheme(GetHandle());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
     this->Show();
@@ -64,6 +73,16 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   switch (message) {
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
+      break;
+    case WM_SETTINGCHANGE:
+      // Handle system theme changes
+      if (lparam && wcscmp(reinterpret_cast<LPCWSTR>(lparam), L"ImmersiveColorSet") == 0) {
+        UpdateTheme(hwnd);
+        // Force Flutter to redraw with new theme
+        if (flutter_controller_) {
+          flutter_controller_->ForceRedraw();
+        }
+      }
       break;
   }
 

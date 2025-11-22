@@ -18,15 +18,19 @@ class ProductAttributeValueApiService {
       print('🎨 [ATTRIBUTE_VALUE_API] Input attributeValues: $attributeValues');
 
       // Transform Map<attributeId, List<value>> to API format
-      final values = attributeValues.entries.map((entry) {
+      // Filter out empty values
+      final values = attributeValues.entries
+          .where((entry) => entry.value.isNotEmpty) // Only include non-empty values
+          .map((entry) {
         return {
           'attributeId': entry.key,
           'value': entry.value, // Store as JSON array
         };
       }).toList();
 
-      print('🎨 [ATTRIBUTE_VALUE_API] Transformed values: $values');
+      print('🎨 [ATTRIBUTE_VALUE_API] Transformed values (filtered): $values');
 
+      // Always call API even if values is empty - to clear all values when needed
       final response = await dio.post(
         '/products/$productId/attribute-values',
         data: {'values': values},

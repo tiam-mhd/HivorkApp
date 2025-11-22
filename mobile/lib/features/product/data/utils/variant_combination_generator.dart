@@ -35,16 +35,31 @@ class VariantCombinationGenerator {
   }
 
   /// Generates human-readable name from combination
-  /// Example: {color: 'red', size: 'M'} => "قرمز - M"
+  /// Values can be in "value|label" format - uses label for name
+  /// Example: {color: '#FF0000|قرمز', size: 'M|متوسط'} => "قرمز - متوسط"
   static String generateVariantName(Map<String, String> combination) {
-    return combination.values.join(' - ');
+    return combination.values.map((v) {
+      // Extract label from "value|label" format
+      if (v.contains('|')) {
+        return v.split('|').last;
+      }
+      return v;
+    }).join(' - ');
   }
 
   /// Generates SKU suffix from combination
-  /// Example: {color: 'red', size: 'M'} => "RED-M"
+  /// Uses value part (before |) for SKU
+  /// Example: {color: '#FF0000|قرمز', size: 'M|متوسط'} => "FF0000-M"
   static String generateSKUSuffix(Map<String, String> combination) {
     return combination.values
-        .map((v) => v.toUpperCase().replaceAll(' ', '-'))
+        .map((v) {
+          // Extract value from "value|label" format
+          final value = v.contains('|') ? v.split('|').first : v;
+          return value.toUpperCase()
+              .replaceAll('#', '')
+              .replaceAll(' ', '-')
+              .replaceAll('_', '-');
+        })
         .join('-');
   }
 }

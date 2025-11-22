@@ -7,7 +7,7 @@ import '../../data/services/product_api_service.dart';
 import '../../data/services/category_api_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../bloc/product_bloc.dart';
-import '../widgets/product_variants_tab.dart';
+import '../widgets/product_attributes_tab.dart';
 
 class ProductFormPage extends StatefulWidget {
   final String businessId;
@@ -317,7 +317,7 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
               indicatorColor: theme.colorScheme.primary,
               tabs: const [
                 Tab(text: 'اطلاعات پایه', icon: Icon(Icons.info_outline, size: 20)),
-                Tab(text: 'تنوع محصول', icon: Icon(Icons.playlist_add, size: 20)),
+                Tab(text: 'ویژگی‌ها و تنوع', icon: Icon(Icons.playlist_add, size: 20)),
               ],
             ),
           ),
@@ -563,7 +563,7 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
                             label: 'موجودی فعلی',
                             hint: '100',
                             keyboardType: TextInputType.number,
-                            enabled: !isLoading && _trackInventory,
+                            enabled: !isLoading && _trackInventory && !_hasVariants,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -573,7 +573,7 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
                             label: 'حداقل موجودی',
                             hint: '10',
                             keyboardType: TextInputType.number,
-                            enabled: !isLoading && _trackInventory,
+                            enabled: !isLoading && _trackInventory && !_hasVariants,
                           ),
                         ),
                       ],
@@ -588,7 +588,7 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
                             label: 'حداکثر موجودی (اختیاری)',
                             hint: '1000',
                             keyboardType: TextInputType.number,
-                            enabled: !isLoading && _trackInventory,
+                            enabled: !isLoading && _trackInventory && !_hasVariants,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -598,7 +598,7 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
                             label: 'نقطه سفارش (اختیاری)',
                             hint: '20',
                             keyboardType: TextInputType.number,
-                            enabled: !isLoading && _trackInventory,
+                            enabled: !isLoading && _trackInventory && !_hasVariants,
                           ),
                         ),
                       ],
@@ -680,7 +680,7 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
                     ),
                   ),
                   
-                  // Tab 2: تنوع محصول
+                  // Tab 2: ویژگی‌ها و تنوع
                   widget.product?.id == null
                       ? Center(
                           child: Padding(
@@ -702,7 +702,7 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  'بعد از ذخیره محصول، می‌توانید تنوع‌ها را مدیریت کنید',
+                                  'بعد از ذخیره محصول، می‌توانید ویژگی‌ها و تنوع‌ها را مدیریت کنید',
                                   textAlign: TextAlign.center,
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: theme.colorScheme.outline,
@@ -712,10 +712,10 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
                             ),
                           ),
                         )
-                      : ProductVariantsTab(
+                      : ProductAttributesTab(
                           productId: widget.product!.id,
-                          productName: _nameController.text.isNotEmpty ? _nameController.text : (widget.product?.name ?? 'محصول'),
                           businessId: widget.businessId,
+                          productName: _nameController.text.isNotEmpty ? _nameController.text : (widget.product?.name ?? 'محصول'),
                           hasVariants: _hasVariants,
                           onHasVariantsChanged: (value) {
                             setState(() => _hasVariants = value);

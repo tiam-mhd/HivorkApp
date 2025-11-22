@@ -162,7 +162,10 @@ class VariantApiService {
         // Handle direct array response (empty or with items)
         if (responseData is List) {
           final variants = responseData
-              .map((json) => ProductVariant.fromJson(json as Map<String, dynamic>))
+              .map((json) {
+                print('📦 [VARIANT_API] Variant attributes from list: ${json['attributes']}');
+                return ProductVariant.fromJson(json as Map<String, dynamic>);
+              })
               .toList();
 
           return {
@@ -180,7 +183,10 @@ class VariantApiService {
         if (responseData is Map) {
           final List<dynamic> dataList = responseData['data'] ?? [];
           final variants = dataList
-              .map((json) => ProductVariant.fromJson(json as Map<String, dynamic>))
+              .map((json) {
+                print('📦 [VARIANT_API] Variant attributes from paginated list: ${json['attributes']}');
+                return ProductVariant.fromJson(json as Map<String, dynamic>);
+              })
               .toList();
 
           return {
@@ -272,10 +278,12 @@ class VariantApiService {
         
         if (responseData is Map && responseData.containsKey('data')) {
           final variantData = responseData['data'];
+          print('📦 [VARIANT_API] Variant data attributes: ${variantData['attributes']}');
           return ProductVariant.fromJson(variantData as Map<String, dynamic>);
         }
         
         if (responseData is Map) {
+          print('📦 [VARIANT_API] Direct variant data attributes: ${responseData['attributes']}');
           return ProductVariant.fromJson(responseData as Map<String, dynamic>);
         }
         
@@ -432,6 +440,53 @@ class VariantApiService {
     } catch (e) {
       print('❌ [VARIANT_API] Error: $e');
       throw Exception('خطا در حذف Variant: $e');
+    }
+  }
+
+  // تولید خودکار Variants براساس ویژگی‌های محصول
+  Future<Map<String, dynamic>> autoGenerateVariants(String productId, String businessId) async {
+    try {
+      print('🎨 [VARIANT_API] Auto-generating variants for product: $productId');
+      print('🎨 [VARIANT_API] Business ID: $businessId');
+      
+      final response = await dio.post('/products/$productId/variants/auto-generate?businessId=$businessId');
+
+      print('✅ [VARIANT_API] Response status: ${response.statusCode}');
+      print('✅ [VARIANT_API] Response data: ${response.data}');
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final responseData = response.data;
+        
+        if (responseData is Map) {
+          final deletedCount = responseData['deleted'] ?? 0;
+          final List<dynamic> createdList = responseData['created'] ?? [];
+          
+          final createdVariants = createdList
+              .map((json) => ProductVariant.fromJson(json as Map<String, dynamic>))
+              .toList();
+
+          return {
+            'deleted': deletedCount,
+            'created': createdVariants,
+          };
+        }
+        
+        throw Exception('Invalid response format');
+      } else {
+        throw Exception(response.data['message'] ?? 'Failed to auto-generate variants');
+      }
+    } on DioException catch (e) {
+      print('❌ [VARIANT_API] DioException: ${e.response?.statusCode}');
+      print('❌ [VARIANT_API] Error data: ${e.response?.data}');
+      
+      if (e.response?.data != null && e.response!.data['message'] != null) {
+        throw Exception(e.response!.data['message']);
+      } else {
+        throw Exception('خطا در تولید خودکار تنوع‌ها');
+      }
+    } catch (e) {
+      print('❌ [VARIANT_API] Parse Error: $e');
+      throw Exception('خطا در تولید خودکار تنوع‌ها: $e');
     }
   }
 

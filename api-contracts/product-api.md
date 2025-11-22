@@ -843,12 +843,45 @@ PATCH /api/products/:productId/variants/:variantId/stock
 DELETE /api/products/:productId/variants/:variantId
 ```
 
-#### 8. Get Low Stock Variants
+#### 8. Auto-Generate Variants
+```
+POST /api/products/:productId/variants/auto-generate
+```
+
+**توضیحات:**
+- تمام تنوع‌های قبلی محصول را حذف می‌کند
+- براساس ویژگی‌های variant_level محصول، تمام ترکیب‌های ممکن را تولید می‌کند
+- SKU به صورت خودکار از `product.code` + شماره ترتیبی ساخته می‌شود
+- نام تنوع از لیبل‌های ویژگی‌ها ساخته می‌شود
+- موجودی اولیه همه تنوع‌ها صفر است
+
+**Response:**
+```json
+{
+  "deleted": 5,
+  "created": [
+    {
+      "id": "uuid",
+      "sku": "TSH-V001",
+      "name": "تیشرت - قرمز - Large",
+      "attributes": {
+        "color": "#FF0000",
+        "size": "L"
+      },
+      "currentStock": 0,
+      "salePrice": 150000,
+      "status": "out_of_stock"
+    }
+  ]
+}
+```
+
+#### 9. Get Low Stock Variants
 ```
 GET /api/variants/low-stock
 ```
 
-#### 9. Get Out of Stock Variants
+#### 10. Get Out of Stock Variants
 ```
 GET /api/variants/out-of-stock
 ```

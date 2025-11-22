@@ -38,7 +38,8 @@ class _AttributeFormDialogState extends State<AttributeFormDialog> {
   bool _isActive = true;
   bool _allowCustomValue = false;
   
-  // Options removed - values will be defined at product level
+  // Options for SELECT/COLOR types
+  List<Map<String, dynamic>> _options = [];
   
   bool _isLoading = false;
 
@@ -59,6 +60,16 @@ class _AttributeFormDialogState extends State<AttributeFormDialog> {
     _isRequired = attr?.required ?? false;
     _isActive = attr?.isActive ?? true;
     _allowCustomValue = attr?.allowCustomValue ?? false;
+    
+    // Load options if exists
+    if (attr?.options != null && attr!.options!.isNotEmpty) {
+      _options = attr.options!.map((opt) => {
+        'value': opt.value,
+        'label': opt.label,
+        if (opt.color != null) 'color': opt.color,
+        'sortOrder': opt.sortOrder,
+      }).toList();
+    }
   }
 
   @override
@@ -95,6 +106,8 @@ class _AttributeFormDialogState extends State<AttributeFormDialog> {
           'description': _descriptionController.text,
         if (_helpTextController.text.isNotEmpty)
           'helpText': _helpTextController.text,
+        if (_options.isNotEmpty)
+          'options': _options,
       };
 
       if (widget.attribute != null) {
@@ -130,6 +143,250 @@ class _AttributeFormDialogState extends State<AttributeFormDialog> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Widget _buildOptionsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_options.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: context.surfaceColor.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: context.textSecondary.withOpacity(0.3)),
+            ),
+            child: Column(
+              children: [
+                Icon(Icons.inventory_2_outlined, size: 48, color: context.textSecondary),
+                const SizedBox(height: 8),
+                Text(
+                  'هنوز گزینه‌ای اضافه نشده',
+                  style: TextStyle(color: context.textSecondary),
+                ),
+              ],
+            ),
+          )
+        else
+          ...List.generate(_options.length, (index) {
+            final option = _options[index];
+            return _buildOptionCard(option, index);
+          }),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _addOption,
+          icon: const Icon(Icons.add),
+          label: const Text('افزودن گزینه'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOptionCard(Map<String, dynamic> option, int index) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isColor = _dataType == AttributeDataType.color;
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: isColor && option['color'] != null
+            ? Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: _parseColor(option['color']),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+                    width: 2,
+                  ),
+                ),
+              )
+            : CircleAvatar(
+                child: Text('${index + 1}'),
+              ),
+        title: Text(
+          option['label'] ?? '',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: isColor ? null : Text('مقدار: ${option['value']}'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, size: 20),
+              onPressed: () => _editOption(index),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+              onPressed: () => _deleteOption(index),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _parseColor(String colorCode) {
+    try {
+      final hex = colorCode.replaceAll('#', '');
+      if (hex.length == 6) {
+        return Color(int.parse('FF$hex', radix: 16));
+      }
+      return Colors.grey;
+    } catch (e) {
+      return Colors.grey;
+    }
+  }
+
+  void _addOption() {
+    _showOptionDialog();
+  }
+
+  void _editOption(int index) {
+    _showOptionDialog(index: index, existingOption: _options[index]);
+  }
+
+  void _deleteOption(int index) {
+    setState(() {
+      _options.removeAt(index);
+    });
+  }
+
+  void _showOptionDialog({int? index, Map<String, dynamic>? existingOption}) {
+    final valueController = TextEditingController(text: existingOption?['value'] ?? '');
+    final labelController = TextEditingController(text: existingOption?['label'] ?? '');
+    String selectedColor = existingOption?['color'] ?? '#FF0000';
+    final isColor = _dataType == AttributeDataType.color;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(index == null ? 'افزودن گزینه' : 'ویرایش گزینه'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: labelController,
+                  decoration: const InputDecoration(
+                    labelText: 'نام رنگ',
+                    hintText: 'مثال: قرمز، آبی، سبز',
+                  ),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 12),
+                if (isColor) ...[
+                  // نمایش رنگ انتخاب شده
+                  const Text('رنگ انتخابی:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: _parseColor(selectedColor),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300, width: 2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // پالت رنگ‌های پیش‌فرض
+                  const Text('رنگ‌های پیش‌فرض:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      '#FF0000', // قرمز
+                      '#00FF00', // سبز
+                      '#0000FF', // آبی
+                      '#FFFF00', // زرد
+                      '#FF00FF', // صورتی
+                      '#00FFFF', // فیروزه‌ای
+                      '#FFA500', // نارنجی
+                      '#800080', // بنفش
+                      '#000000', // مشکی
+                      '#FFFFFF', // سفید
+                      '#808080', // خاکستری
+                      '#A52A2A', // قهوه‌ای
+                    ].map((color) => InkWell(
+                      onTap: () {
+                        setDialogState(() {
+                          selectedColor = color;
+                          // اگر value خالی بود، از کد رنگ استفاده کن
+                          if (valueController.text.isEmpty) {
+                            valueController.text = color.replaceAll('#', '').toLowerCase();
+                          }
+                        });
+                      },
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: _parseColor(color),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: selectedColor == color ? Colors.blue : Colors.grey.shade300,
+                            width: selectedColor == color ? 3 : 2,
+                          ),
+                        ),
+                      ),
+                    )).toList(),
+                  ),
+                ] else ...[
+                  TextField(
+                    controller: valueController,
+                    decoration: const InputDecoration(
+                      labelText: 'مقدار',
+                      hintText: 'مثال: S, M, L',
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('انصراف'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (labelController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('لطفاً نام را وارد کنید')),
+                  );
+                  return;
+                }
+
+                final newOption = {
+                  'value': isColor 
+                      ? (valueController.text.isEmpty ? selectedColor.replaceAll('#', '').toLowerCase() : valueController.text)
+                      : valueController.text,
+                  'label': labelController.text,
+                  if (isColor) 'color': selectedColor,
+                  'sortOrder': index ?? _options.length,
+                };
+
+                setState(() {
+                  if (index != null) {
+                    _options[index] = newOption;
+                  } else {
+                    _options.add(newOption);
+                  }
+                });
+
+                Navigator.pop(context);
+              },
+              child: Text(index == null ? 'افزودن' : 'ذخیره'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -387,6 +644,18 @@ class _AttributeFormDialogState extends State<AttributeFormDialog> {
                           });
                         },
                       ),
+                      
+                      // Options Section (for SELECT & COLOR types)
+                      if (_dataType == AttributeDataType.select || _dataType == AttributeDataType.color) ...[
+                        const SizedBox(height: 24),
+                        _SectionHeader(
+                          icon: Icons.list_alt,
+                          title: 'گزینه‌ها',
+                          color: context.primaryColor,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildOptionsSection(),
+                      ],
                       
                       const SizedBox(height: 24),
                       

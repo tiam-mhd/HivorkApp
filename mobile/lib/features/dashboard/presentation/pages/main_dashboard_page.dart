@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../business/data/datasources/business_api_service.dart';
 import '../../../business/data/models/business_model.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/theme/theme_notifier.dart';
 import '../widgets/no_business_widget.dart';
 import '../../../product/presentation/pages/products_page.dart';
 import 'home_tab_page.dart';
@@ -698,6 +700,9 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                       // Navigate to about
                     },
                   ),
+                  const Divider(height: 24, indent: 16, endIndent: 16),
+                  // Theme Switcher
+                  _buildThemeSwitcher(),
                 ],
               ),
             ),
@@ -828,6 +833,53 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
               )
             : null,
         onTap: onTap,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      ),
+    );
+  }
+
+  Widget _buildThemeSwitcher() {
+    final theme = Theme.of(context);
+    final themeNotifier = context.watch<ThemeNotifier>();
+    final isDark = themeNotifier.themeMode == ThemeMode.dark;
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+            color: theme.colorScheme.onSurfaceVariant,
+            size: 22,
+          ),
+        ),
+        title: Text(
+          'حالت تاریک',
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        trailing: Switch(
+          value: isDark,
+          onChanged: (value) {
+            themeNotifier.setThemeMode(value ? ThemeMode.dark : ThemeMode.light);
+          },
+          activeColor: theme.colorScheme.primary,
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),

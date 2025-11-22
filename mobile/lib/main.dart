@@ -8,8 +8,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:provider/provider.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_notifier.dart';
 import 'core/constants/app_constants.dart';
 import 'core/router/multi_stream_refresh_notifier.dart';
 import 'core/network/auth_interceptor.dart';
@@ -90,6 +92,7 @@ class HivorkApp extends StatefulWidget {
 class _HivorkAppState extends State<HivorkApp> {
   late final AuthBloc _authBloc;
   late final GoRouter _router;
+  late final ThemeNotifier _themeNotifier;
   bool _minSplashTimeElapsed = false;
   bool _initialAuthCheckDone = false; // پرچم برای اینکه بدونیم اولین چک auth انجام شده
   final _splashTimerController = StreamController<bool>.broadcast();
@@ -97,6 +100,9 @@ class _HivorkAppState extends State<HivorkApp> {
   @override
   void initState() {
     super.initState();
+    
+    // Initialize theme notifier
+    _themeNotifier = ThemeNotifier(widget.secureStorage);
     
     // حداقل 3 ثانیه برای splash screen
     Future.delayed(const Duration(seconds: 3), () {
@@ -356,31 +362,38 @@ class _HivorkAppState extends State<HivorkApp> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider.value(
-      value: _authBloc,
-      child: MaterialApp.router(
-        title: 'هایورک',
-        debugShowCheckedModeBanner: false,
-        
-        // Theme
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system, // Follow system theme
-        
-        // Localization
-        locale: const Locale('fa', 'IR'),
-        supportedLocales: const [
-          Locale('fa', 'IR'),
-          Locale('en', 'US'),
-        ],
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        
-        // Router
-        routerConfig: _router,
+    return ChangeNotifierProvider.value(
+      value: _themeNotifier,
+      child: Consumer<ThemeNotifier>(
+        builder: (context, themeNotifier, _) {
+          return BlocProvider.value(
+            value: _authBloc,
+            child: MaterialApp.router(
+              title: 'هایورک',
+              debugShowCheckedModeBanner: false,
+              
+              // Theme - Controlled by ThemeNotifier
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              themeMode: themeNotifier.themeMode,
+              
+              // Localization
+              locale: const Locale('fa', 'IR'),
+              supportedLocales: const [
+                Locale('fa', 'IR'),
+                Locale('en', 'US'),
+              ],
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              
+              // Router
+              routerConfig: _router,
+            ),
+          );
+        },
       ),
     );
   }

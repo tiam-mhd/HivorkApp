@@ -380,9 +380,22 @@ class _AttributeCard extends StatelessWidget {
     required this.onToggleActive,
   });
 
+  Color _parseColor(String colorCode) {
+    try {
+      final hex = colorCode.replaceAll('#', '');
+      if (hex.length == 6) {
+        return Color(int.parse('FF$hex', radix: 16));
+      }
+      return Colors.grey;
+    } catch (e) {
+      return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -530,8 +543,9 @@ class _AttributeCard extends StatelessWidget {
                 ],
               ),
 
-              // Options Preview (for select type)
-              if (attribute.dataType == AttributeDataType.select &&
+              // Options Preview (for select & color types)
+              if ((attribute.dataType == AttributeDataType.select || 
+                   attribute.dataType == AttributeDataType.color) &&
                   attribute.options != null &&
                   attribute.options!.isNotEmpty)
                 Padding(
@@ -552,6 +566,49 @@ class _AttributeCard extends StatelessWidget {
                         runSpacing: 6,
                         children:
                             attribute.options!.take(5).map((option) {
+                              // برای رنگ، فقط دایره رنگی + نام
+                              if (attribute.dataType == AttributeDataType.color && 
+                                  option.color != null) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: context.surfaceColor,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: context.textSecondary.withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 20,
+                                        height: 20,
+                                        decoration: BoxDecoration(
+                                          color: _parseColor(option.color!),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: isDark 
+                                              ? Colors.grey.shade600 
+                                              : Colors.grey.shade300,
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        option.label,
+                                        style: theme.textTheme.bodySmall,
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                              
+                              // برای بقیه، فقط label
                               return Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,

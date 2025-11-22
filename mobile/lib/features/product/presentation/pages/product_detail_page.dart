@@ -29,6 +29,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   late VariantApiService _variantService;
   List<ProductVariant> _variants = [];
   bool _isLoadingVariants = false;
+  bool _hasLoadedVariants = false; // Track if we've attempted to load
 
   @override
   void initState() {
@@ -46,13 +47,39 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Future<void> _loadVariants() async {
+    if (_hasLoadedVariants) return; // Already attempted to load
+    
     setState(() {
       _isLoadingVariants = true;
+      _hasLoadedVariants = true; // Mark as attempted
     });
 
     try {
+      print('🔵 [PRODUCT_DETAIL] Loading variants for product: ${widget.productId}');
       final result = await _variantService.getVariants(productId: widget.productId);
-      final variantsList = result['data'] as List<ProductVariant>;
+      
+      print('✅ [PRODUCT_DETAIL] Variants API response: $result');
+      print('✅ [PRODUCT_DETAIL] Data type: ${result['data'].runtimeType}');
+      
+      final data = result['data'];
+      List<ProductVariant> variantsList;
+      
+      if (data is List<ProductVariant>) {
+        variantsList = data;
+      } else if (data is List) {
+        // Parse from List<dynamic> or List<Map>
+        variantsList = data
+            .map((v) {
+              if (v is ProductVariant) return v;
+              if (v is Map<String, dynamic>) return ProductVariant.fromJson(v);
+              throw Exception('Invalid variant type: ${v.runtimeType}');
+            })
+            .toList();
+      } else {
+        variantsList = [];
+      }
+      
+      print('✅ [PRODUCT_DETAIL] Parsed ${variantsList.length} variants');
       
       // Sort: in-stock first
       variantsList.sort((a, b) {
@@ -65,7 +92,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         _variants = variantsList;
         _isLoadingVariants = false;
       });
-    } catch (e) {
+      
+      print('✅ [PRODUCT_DETAIL] Variants loaded successfully');
+    } catch (e, stack) {
+      print('❌ [PRODUCT_DETAIL] Error loading variants: $e');
+      print('❌ [PRODUCT_DETAIL] Stack trace: $stack');
       setState(() {
         _isLoadingVariants = false;
       });
@@ -821,8 +852,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _buildVariantStocks(Product product, ThemeData theme, intl.NumberFormat numberFormat) {
-    if (_variants.isEmpty && !_isLoadingVariants) {
-      // Load variants on first render
+    // Load variants only once on first render
+    if (!_hasLoadedVariants && !_isLoadingVariants) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadVariants();
       });
@@ -971,19 +1002,22 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       ),
       child: Row(
         children: [
-          // Color indicator
+          // Color indicator(s)
           if (colors.isNotEmpty)
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: _parseVariantColor(colors.first),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
-                  width: 1.5,
+            Wrap(
+              spacing: 4,
+              children: colors.take(3).map((color) => Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: _parseVariantColor(color),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+                    width: 1.5,
+                  ),
                 ),
-              ),
+              )).toList(),
             )
           else
             Container(

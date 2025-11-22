@@ -88,6 +88,101 @@ class _VariantsManagementPageState extends State<VariantsManagementPage> {
     ).toList();
   }
 
+  void _autoGenerateVariants() {
+    // اگر تنوع داریم، دیالوگ تایید نشون بده
+    if (_variants.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('تولید خودکار تنوع‌ها'),
+          content: Text(
+            'در حال حاضر ${_variants.length} تنوع ثبت شده است.\n\n'
+            'با تولید خودکار، تمام تنوع‌های قبلی حذف شده و براساس ویژگی‌های محصول، تنوع‌های جدید ایجاد می‌شوند.\n\n'
+            'آیا ادامه می‌دهید؟',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('انصراف'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _performAutoGenerate();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: context.errorColor,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('بله، ادامه بده'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // اگر تنوع نداریم، مستقیم تولید کن
+      _performAutoGenerate();
+    }
+  }
+
+  Future<void> _performAutoGenerate() async {
+    // نمایش دیالوگ لودینگ
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('در حال تولید تنوع‌ها...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final result = await _variantService.autoGenerateVariants(widget.productId, widget.businessId);
+      final deletedCount = result['deleted'] as int;
+      final createdVariants = result['created'] as List<ProductVariant>;
+
+      if (mounted) {
+        Navigator.pop(context); // بستن دیالوگ لودینگ
+        
+        _loadVariants(); // رفرش لیست
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              deletedCount > 0
+                  ? '$deletedCount تنوع حذف و ${createdVariants.length} تنوع جدید ایجاد شد'
+                  : '${createdVariants.length} تنوع جدید ایجاد شد',
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // بستن دیالوگ لودینگ
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا: ${e.toString()}'),
+            backgroundColor: context.errorColor,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
   void _deleteVariant(ProductVariant variant) {
     showDialog(
       context: context,
@@ -209,6 +304,14 @@ class _VariantsManagementPageState extends State<VariantsManagementPage> {
             ),
           ],
         ),
+        actions: [
+          // دکمه تولید خودکار تنوع‌ها
+          IconButton(
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'تولید خودکار تنوع‌ها',
+            onPressed: _autoGenerateVariants,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -283,12 +386,6 @@ class _VariantsManagementPageState extends State<VariantsManagementPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          if (_variants.isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('ابتدا برای محصول ویژگی تعریف کنید')),
-            );
-            return;
-          }
           showDialog(
             context: context,
             builder: (context) => VariantFormDialog(
@@ -336,19 +433,22 @@ class _VariantsManagementPageState extends State<VariantsManagementPage> {
               // Header Row
               Row(
                 children: [
-                  // Color Circle
+                  // Color Circle(s)
                   if (colors.isNotEmpty)
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: _parseColor(colors.first),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
-                          width: 2,
+                    Wrap(
+                      spacing: 4,
+                      children: colors.take(3).map((color) => Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: _parseColor(color),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+                            width: 2,
+                          ),
                         ),
-                      ),
+                      )).toList(),
                     )
                   else
                     Container(

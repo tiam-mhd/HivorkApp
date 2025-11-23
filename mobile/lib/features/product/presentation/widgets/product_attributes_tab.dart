@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import '../../../../core/extensions/theme_extension.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../data/models/attribute_enums.dart';
 import '../../data/models/product_attribute.dart';
@@ -102,15 +103,37 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
   // Get only attributes that are assigned to this product
   List<ProductAttribute> get _assignedAttributes {
     return _allAttributes
-        .where((attr) => _productAttributeValues.containsKey(attr.id))
+        .where((attr) {
+          // فیلتر بر اساس hasVariants محصول
+          if (widget.hasVariants) {
+            // محصول دارای تنوع: همه ویژگی‌های مرتبط شده (سطح محصول و تنوع)
+            return _productAttributeValues.containsKey(attr.id);
+          } else {
+            // محصول بدون تنوع: فقط ویژگی‌های سطح محصول
+            return _productAttributeValues.containsKey(attr.id) && 
+                   attr.scope == AttributeScope.productLevel;
+          }
+        })
         .toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
   }
 
-  // Get attributes that are NOT assigned yet
+  // Get attributes that are NOT assigned yet (and are appropriate for this product type)
   List<ProductAttribute> get _availableAttributes {
     return _allAttributes
-        .where((attr) => !_productAttributeValues.containsKey(attr.id))
+        .where((attr) {
+          // ابتدا بررسی کنیم که قبلاً assign نشده باشد
+          if (_productAttributeValues.containsKey(attr.id)) return false;
+          
+          // فیلتر بر اساس hasVariants محصول
+          if (widget.hasVariants) {
+            // محصول دارای تنوع: همه ویژگی‌ها (سطح محصول و تنوع) قابل انتخاب
+            return true;
+          } else {
+            // محصول بدون تنوع: فقط ویژگی‌های سطح محصول
+            return attr.scope == AttributeScope.productLevel;
+          }
+        })
         .toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
   }
@@ -124,9 +147,9 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ویژگی‌ها با موفقیت ذخیره شد'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('ویژگی‌ها با موفقیت ذخیره شد'),
+            backgroundColor: context.successColor,
           ),
         );
       }
@@ -135,7 +158,7 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('خطا: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: context.errorColor,
           ),
         );
       }
@@ -224,7 +247,7 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
   }
 
   void _showColorPickerDialog(ProductAttribute attribute, String? currentValue) {
-    Color pickerColor = Colors.blue;
+    Color pickerColor = context.primaryColor;
     
     // Parse current color if exists
     if (currentValue != null && currentValue.isNotEmpty) {
@@ -237,7 +260,7 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
           pickerColor = Color(int.parse(colorOption!.color!.replaceFirst('#', '0xFF')));
         }
       } catch (e) {
-        pickerColor = Colors.blue;
+        pickerColor = context.primaryColor;
       }
     }
 
@@ -282,7 +305,7 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
                     decoration: BoxDecoration(
                       color: selectedColor,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300, width: 2),
+                      border: Border.all(color: context.borderColor, width: 2),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -403,7 +426,7 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
       context: context,
       builder: (context) {
         List<Color> colors = List.from(selectedColors);
-        Color pickerColor = Colors.blue;
+        Color pickerColor = context.primaryColor;
         final colorLabelController = TextEditingController();
         
         return StatefulBuilder(
@@ -428,14 +451,14 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
                             decoration: BoxDecoration(
                               color: color,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.grey.shade300, width: 2),
+                              border: Border.all(color: context.borderColor, width: 2),
                             ),
                           ),
                           Positioned(
                             top: -5,
                             right: -5,
                             child: IconButton(
-                              icon: const Icon(Icons.cancel, color: Colors.red, size: 20),
+                              icon: Icon(Icons.cancel, color: context.errorColor, size: 20),
                               onPressed: () {
                                 setState(() => colors.remove(color));
                               },
@@ -676,7 +699,7 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
           children: [
             Text(
               'مقدار و عنوان را وارد کنید:',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: context.textSecondary),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -759,7 +782,7 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
               children: [
                 Text(
                   'مقدار و عنوان را وارد کنید:',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 12, color: context.textSecondary),
                 ),
                 const SizedBox(height: 12),
                 ...valueControllers.asMap().entries.map((entry) {
@@ -779,13 +802,13 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 12,
-                                color: Colors.blue.shade700,
+                                color: context.primaryColor,
                               ),
                             ),
                             const Spacer(),
                             if (valueControllers.length > 1)
                               IconButton(
-                                icon: const Icon(Icons.remove_circle, color: Colors.red, size: 20),
+                                icon: Icon(Icons.remove_circle, color: context.errorColor, size: 20),
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
                                 onPressed: () {
@@ -887,7 +910,7 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            Icon(Icons.error_outline, size: 48, color: context.errorColor),
             const SizedBox(height: 16),
             Text(_errorMessage!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -912,7 +935,7 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                            Icon(Icons.error_outline, size: 48, color: context.errorColor),
                             const SizedBox(height: 16),
                             Text(_errorMessage!, textAlign: TextAlign.center),
                             const SizedBox(height: 16),
@@ -1056,16 +1079,15 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
 
   Widget _buildAttributeCard(ProductAttribute attribute, ThemeData theme) {
     final values = _productAttributeValues[attribute.id] ?? [];
-    final isDark = theme.brightness == Brightness.dark;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: isDark ? Colors.blue.shade800 : Colors.blue.shade100,
+          backgroundColor: context.primaryColor.withValues(alpha: 0.2),
           child: Icon(
             _getAttributeIcon(attribute.dataType),
-            color: isDark ? Colors.blue.shade100 : Colors.blue.shade800,
+            color: context.primaryColor,
             size: 20,
           ),
         ),
@@ -1076,12 +1098,12 @@ class _ProductAttributesTabState extends State<ProductAttributesTab>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade100,
+                  color: context.errorColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   'الزامی',
-                  style: TextStyle(fontSize: 10, color: Colors.red.shade900),
+                  style: TextStyle(fontSize: 10, color: context.errorColor),
                 ),
               ),
           ],

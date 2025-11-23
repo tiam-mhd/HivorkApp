@@ -211,14 +211,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           return Container(
                             height: 56,
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  theme.colorScheme.primary,
-                                  theme.colorScheme.primaryContainer,
-                                ],
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                              ),
+                              color: theme.colorScheme.primary,
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(

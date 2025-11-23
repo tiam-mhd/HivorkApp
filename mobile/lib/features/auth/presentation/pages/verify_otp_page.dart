@@ -208,11 +208,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage>
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [theme.colorScheme.primary, theme.colorScheme.primaryContainer],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: theme.colorScheme.primary,
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
@@ -349,11 +345,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage>
                     return Container(
                       height: 56,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [theme.colorScheme.primary, theme.colorScheme.primaryContainer],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
+                        color: theme.colorScheme.primary,
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(

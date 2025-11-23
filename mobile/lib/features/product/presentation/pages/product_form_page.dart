@@ -1,29 +1,33 @@
+import 'package:universal_io/io.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/extensions/theme_extension.dart';
+import '../../../../core/utils/logger.dart';
 import '../../data/models/product.dart';
 import '../../data/models/product_category.dart';
 import '../../data/repositories/product_repository.dart';
 import '../../data/services/product_api_service.dart';
 import '../../data/services/category_api_service.dart';
+import '../../data/services/image_upload_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../bloc/product_bloc.dart';
 import '../widgets/product_attributes_tab.dart';
+import '../widgets/product_image_picker.dart';
 
 class ProductFormPage extends StatefulWidget {
   final String businessId;
   final Product? product;
 
-  const ProductFormPage({
-    Key? key,
-    required this.businessId,
-    this.product,
-  }) : super(key: key);
+  const ProductFormPage({Key? key, required this.businessId, this.product})
+    : super(key: key);
 
   @override
   State<ProductFormPage> createState() => _ProductFormPageState();
 }
 
-class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProviderStateMixin {
+class _ProductFormPageState extends State<ProductFormPage>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   late ProductBloc _productBloc;
   late TabController _tabController;
@@ -53,14 +57,22 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
   ProductUnit _selectedUnit = ProductUnit.piece;
   ProductStatus _selectedStatus = ProductStatus.active;
   bool _trackInventory = true;
-  
+
   // Category selection
   ProductCategory? _selectedCategory;
   List<ProductCategory> _categories = [];
   bool _loadingCategories = true;
-  
+
   // Variants
   bool _hasVariants = false;
+
+  // Images
+  File? _mainImageFile;
+  List<File> _additionalImageFiles = [];
+  Uint8List? _mainImageBytes; // برای وب
+  List<Uint8List> _additionalImageBytes = []; // برای وب
+  late ImageUploadService _imageUploadService;
+  bool _uploadingImages = false;
 
   @override
   void initState() {
@@ -68,9 +80,10 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
     _tabController = TabController(length: 2, vsync: this);
     final dio = ServiceLocator().dio;
     _productBloc = ProductBloc(ProductRepository(ProductApiService(dio)));
+    _imageUploadService = ImageUploadService(dio);
     _loadCategories();
   }
-  
+
   Future<void> _loadCategories() async {
     try {
       final dio = ServiceLocator().dio;
@@ -80,7 +93,7 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
         _categories = categories;
         _loadingCategories = false;
       });
-      
+
       // Populate fields after categories are loaded
       if (widget.product != null) {
         _populateFields();
@@ -89,7 +102,7 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
       setState(() {
         _loadingCategories = false;
       });
-      
+
       // Still populate fields even if categories fail to load
       if (widget.product != null) {
         _populateFields();
@@ -123,7 +136,7 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
     _selectedStatus = product.status;
     _trackInventory = product.trackInventory;
     _hasVariants = product.hasVariants ?? false;
-    
+
     // Set selected category if exists and categories are loaded
     if (product.category != null && _categories.isNotEmpty) {
       try {
@@ -163,16 +176,22 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
     super.dispose();
   }
 
-  void _saveProduct() {
+  void _saveProduct() async {
     if (!_formKey.currentState!.validate()) return;
 
     final productData = {
       'name': _nameController.text,
-      'nameEn': _nameEnController.text.isNotEmpty ? _nameEnController.text : null,
-      'description': _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
+      'nameEn': _nameEnController.text.isNotEmpty
+          ? _nameEnController.text
+          : null,
+      'description': _descriptionController.text.isNotEmpty
+          ? _descriptionController.text
+          : null,
       'type': _selectedType.name,
       'unit': _getUnitValue(_selectedUnit),
-      'barcode': _barcodeController.text.isNotEmpty ? _barcodeController.text : null,
+      'barcode': _barcodeController.text.isNotEmpty
+          ? _barcodeController.text
+          : null,
       'category': _selectedCategory?.id,
       'brand': _brandController.text.isNotEmpty ? _brandController.text : null,
       'purchasePrice': double.parse(_purchasePriceController.text),
@@ -193,7 +212,9 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
       'trackInventory': _trackInventory,
       'hasVariants': _hasVariants,
       'sku': _skuController.text.isNotEmpty ? _skuController.text : null,
-      'supplier': _supplierController.text.isNotEmpty ? _supplierController.text : null,
+      'supplier': _supplierController.text.isNotEmpty
+          ? _supplierController.text
+          : null,
       'weight': _weightController.text.isNotEmpty
           ? double.parse(_weightController.text)
           : null,
@@ -208,6 +229,54 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
       productData['code'] = _codeController.text;
       productData['businessId'] = widget.businessId;
       _productBloc.add(CreateProduct(productData));
+    }
+  }
+
+  Future<void> _uploadProductImages(String productId) async {
+    if (_mainImageFile == null && _additionalImageFiles.isEmpty) {
+      return;
+    }
+
+    setState(() => _uploadingImages = true);
+
+    try {
+      // آپلود عکس اصلی
+      if (_mainImageFile != null) {
+        await _imageUploadService.uploadProductMainImage(
+          productId: productId,
+          imageFile: _mainImageFile!,
+          imageBytes: _mainImageBytes, // پاس دادن bytes برای وب
+        );
+      }
+
+      // آپلود عکس‌های اضافی
+      if (_additionalImageFiles.isNotEmpty) {
+        await _imageUploadService.uploadProductImages(
+          productId: productId,
+          imageFiles: _additionalImageFiles,
+          imageBytesList: _additionalImageBytes, // پاس دادن bytes برای وب
+        );
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تصاویر با موفقیت آپلود شدند'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در آپلود تصاویر: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _uploadingImages = false);
     }
   }
 
@@ -280,20 +349,56 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
     return BlocProvider.value(
       value: _productBloc,
       child: BlocListener<ProductBloc, ProductState>(
-        listener: (context, state) {
+        listener: (context, state) async {
           if (state is ProductOperationSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.green,
-              ),
-            );
+            // اگر محصول جدید ایجاد شد، عکس‌ها را آپلود کن
+            if (widget.product == null && state.message.contains('ایجاد')) {
+              // باید productId را از response بگیریم
+              // فعلاً فقط پیام موفقیت نمایش می‌دهیم
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('محصول با موفقیت ایجاد شد'),
+                  backgroundColor: context.successColor,
+                ),
+              );
+
+              // اگر عکس داریم، پیام نمایش بده
+              if (_mainImageFile != null || _additionalImageFiles.isNotEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('لطفاً پس از ایجاد محصول، از صفحه ویرایش عکس‌ها را آپلود کنید'),
+                    backgroundColor: Colors.orange,
+                    duration: Duration(seconds: 4),
+                  ),
+                );
+              }
+            } else if (widget.product != null) {
+              // در حالت ویرایش، عکس‌ها را آپلود کن
+              if (_mainImageFile != null || _additionalImageFiles.isNotEmpty) {
+                await _uploadProductImages(widget.product!.id);
+              }
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: context.successColor,
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: context.successColor,
+                ),
+              );
+            }
+            
             Navigator.pop(context, true);
           } else if (state is ProductError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
-                backgroundColor: Colors.red,
+                backgroundColor: context.errorColor,
               ),
             );
           }
@@ -313,11 +418,22 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
             bottom: TabBar(
               controller: _tabController,
               labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(0.6),
+              unselectedLabelColor: theme.colorScheme.onSurface.withOpacity(
+                0.6,
+              ),
               indicatorColor: theme.colorScheme.primary,
-              tabs: const [
-                Tab(text: 'اطلاعات پایه', icon: Icon(Icons.info_outline, size: 20)),
-                Tab(text: 'ویژگی‌ها و تنوع', icon: Icon(Icons.playlist_add, size: 20)),
+              tabs: [
+                Tab(
+                  text: 'اطلاعات پایه',
+                  icon: Icon(Icons.info_outline, size: 20),
+                ),
+                Tab(
+                  text: _hasVariants ? 'ویژگی‌ها و تنوع' : 'ویژگی‌ها',
+                  icon: Icon(
+                    _hasVariants ? Icons.playlist_add : Icons.list,
+                    size: 20,
+                  ),
+                ),
               ],
             ),
           ),
@@ -332,354 +448,440 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
                   Form(
                     key: _formKey,
                     child: ListView(
-                  padding: const EdgeInsets.all(20),
-                  children: [
-                    // Basic Info Section
-                    _buildSectionTitle('اطلاعات پایه', theme),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _codeController,
-                      label: 'کد محصول',
-                      hint: 'PRD-001',
-                      validator: (value) => value?.isEmpty ?? true ? 'کد محصول الزامی است' : null,
-                      enabled: !isLoading,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _nameController,
-                      label: 'نام محصول',
-                      hint: 'لپ‌تاپ ایسوس',
-                      validator: (value) => value?.isEmpty ?? true ? 'نام محصول الزامی است' : null,
-                      enabled: !isLoading,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _nameEnController,
-                      label: 'نام انگلیسی (اختیاری)',
-                      hint: 'ASUS Laptop',
-                      enabled: !isLoading,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _descriptionController,
-                      label: 'توضیحات (اختیاری)',
-                      hint: 'توضیحات کامل محصول...',
-                      maxLines: 3,
-                      enabled: !isLoading,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Type & Unit
-                    Row(
+                      padding: const EdgeInsets.all(20),
                       children: [
-                        Expanded(
-                          child: _buildDropdown<ProductType>(
-                            label: 'نوع',
-                            value: _selectedType,
-                            items: [
-                              DropdownMenuItem(value: ProductType.goods, child: Text('کالا')),
-                              DropdownMenuItem(value: ProductType.service, child: Text('خدمات')),
-                            ],
-                            onChanged: isLoading ? null : (value) {
-                              setState(() => _selectedType = value!);
-                            },
-                            theme: theme,
-                          ),
+                        // Basic Info Section
+                        _buildSectionTitle('اطلاعات پایه', theme),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _codeController,
+                          label: 'کد محصول',
+                          hint: 'PRD-001',
+                          validator: (value) => value?.isEmpty ?? true
+                              ? 'کد محصول الزامی است'
+                              : null,
+                          enabled: !isLoading,
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildDropdown<ProductUnit>(
-                            label: 'واحد',
-                            value: _selectedUnit,
-                            items: ProductUnit.values.map((unit) {
-                              return DropdownMenuItem(
-                                value: unit,
-                                child: Text(_getUnitLabel(unit)),
-                              );
-                            }).toList(),
-                            onChanged: isLoading ? null : (value) {
-                              setState(() => _selectedUnit = value!);
-                            },
-                            theme: theme,
-                          ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _nameController,
+                          label: 'نام محصول',
+                          hint: 'لپ‌تاپ ایسوس',
+                          validator: (value) => value?.isEmpty ?? true
+                              ? 'نام محصول الزامی است'
+                              : null,
+                          enabled: !isLoading,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _nameEnController,
+                          label: 'نام انگلیسی (اختیاری)',
+                          hint: 'ASUS Laptop',
+                          enabled: !isLoading,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          controller: _descriptionController,
+                          label: 'توضیحات (اختیاری)',
+                          hint: 'توضیحات کامل محصول...',
+                          maxLines: 3,
+                          enabled: !isLoading,
+                        ),
+                        const SizedBox(height: 16),
 
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _barcodeController,
-                            label: 'بارکد (اختیاری)',
-                            hint: '1234567890',
-                            keyboardType: TextInputType.number,
-                            enabled: !isLoading,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _skuController,
-                            label: 'SKU (اختیاری)',
-                            hint: 'SKU-001',
-                            enabled: !isLoading,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _loadingCategories
-                              ? const Center(child: CircularProgressIndicator())
-                              : _buildDropdown<ProductCategory?>(
-                                  label: 'دسته‌بندی (اختیاری)',
-                                  value: _selectedCategory,
-                                  items: [
-                                    DropdownMenuItem<ProductCategory?>(
-                                      value: null,
-                                      child: Text('دسته‌بندی نشده', 
-                                        style: TextStyle(color: theme.colorScheme.outline)),
-                                    ),
-                                    ..._categories.map((cat) {
-                                      return DropdownMenuItem<ProductCategory?>(
-                                        value: cat,
-                                        child: Text(cat.name),
-                                      );
-                                    }).toList(),
-                                  ],
-                                  onChanged: isLoading ? null : (value) {
-                                    setState(() => _selectedCategory = value);
-                                  },
-                                  theme: theme,
-                                ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _brandController,
-                            label: 'برند (اختیاری)',
-                            hint: 'ASUS',
-                            enabled: !isLoading,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Pricing Section
-                    _buildSectionTitle('قیمت‌گذاری', theme),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _purchasePriceController,
-                            label: 'قیمت خرید',
-                            hint: '1000000',
-                            keyboardType: TextInputType.number,
-                            validator: (value) => value?.isEmpty ?? true ? 'الزامی است' : null,
-                            enabled: !isLoading,
-                            suffix: Text('تومان', style: TextStyle(fontSize: 12)),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _salePriceController,
-                            label: 'قیمت فروش',
-                            hint: '1200000',
-                            keyboardType: TextInputType.number,
-                            validator: (value) => value?.isEmpty ?? true ? 'الزامی است' : null,
-                            enabled: !isLoading,
-                            suffix: Text('تومان', style: TextStyle(fontSize: 12)),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _wholesalePriceController,
-                            label: 'قیمت عمده (اختیاری)',
-                            hint: '1100000',
-                            keyboardType: TextInputType.number,
-                            enabled: !isLoading,
-                            suffix: Text('تومان', style: TextStyle(fontSize: 12)),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _taxRateController,
-                            label: 'مالیات (%)',
-                            hint: '9',
-                            keyboardType: TextInputType.number,
-                            enabled: !isLoading,
-                            suffix: Text('%', style: TextStyle(fontSize: 12)),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Inventory Section
-                    _buildSectionTitle('موجودی', theme),
-                    const SizedBox(height: 16),
-                    SwitchListTile(
-                      title: Text('این محصول دارای تنوع است'),
-                      subtitle: Text('محصولات با تنوع دارای رنگ، سایز یا سایر ویژگی‌ها هستند'),
-                      value: _hasVariants,
-                      onChanged: isLoading ? null : (value) {
-                        setState(() => _hasVariants = value);
-                      },
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      title: Text('ردیابی موجودی'),
-                      value: _trackInventory,
-                      onChanged: isLoading ? null : (value) {
-                        setState(() => _trackInventory = value);
-                      },
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    const SizedBox(height: 16),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _currentStockController,
-                            label: 'موجودی فعلی',
-                            hint: '100',
-                            keyboardType: TextInputType.number,
-                            enabled: !isLoading && _trackInventory && !_hasVariants,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _minStockController,
-                            label: 'حداقل موجودی',
-                            hint: '10',
-                            keyboardType: TextInputType.number,
-                            enabled: !isLoading && _trackInventory && !_hasVariants,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _maxStockController,
-                            label: 'حداکثر موجودی (اختیاری)',
-                            hint: '1000',
-                            keyboardType: TextInputType.number,
-                            enabled: !isLoading && _trackInventory && !_hasVariants,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _reorderPointController,
-                            label: 'نقطه سفارش (اختیاری)',
-                            hint: '20',
-                            keyboardType: TextInputType.number,
-                            enabled: !isLoading && _trackInventory && !_hasVariants,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Additional Info Section
-                    _buildSectionTitle('اطلاعات تکمیلی', theme),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _supplierController,
-                            label: 'تامین‌کننده (اختیاری)',
-                            hint: 'شرکت ABC',
-                            enabled: !isLoading,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildTextField(
-                            controller: _weightController,
-                            label: 'وزن/کیلوگرم (اختیاری)',
-                            hint: '2.5',
-                            keyboardType: TextInputType.number,
-                            enabled: !isLoading,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    _buildTextField(
-                      controller: _notesController,
-                      label: 'یادداشت‌ها (اختیاری)',
-                      hint: 'یادداشت‌های داخلی...',
-                      maxLines: 3,
-                      enabled: !isLoading,
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Save Button
-                    SizedBox(
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: isLoading ? null : _saveProduct,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary,
-                          foregroundColor: theme.colorScheme.onPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: isLoading
-                            ? SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation(
-                                    theme.colorScheme.onPrimary,
+                        // Type & Unit
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildDropdown<ProductType>(
+                                label: 'نوع',
+                                value: _selectedType,
+                                items: [
+                                  DropdownMenuItem(
+                                    value: ProductType.goods,
+                                    child: Text('کالا'),
                                   ),
-                                ),
-                              )
-                            : Text(
-                                widget.product != null ? 'بروزرسانی محصول' : 'ذخیره محصول',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                                  DropdownMenuItem(
+                                    value: ProductType.service,
+                                    child: Text('خدمات'),
+                                  ),
+                                ],
+                                onChanged: isLoading
+                                    ? null
+                                    : (value) {
+                                        setState(() => _selectedType = value!);
+                                      },
+                                theme: theme,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildDropdown<ProductUnit>(
+                                label: 'واحد',
+                                value: _selectedUnit,
+                                items: ProductUnit.values.map((unit) {
+                                  return DropdownMenuItem(
+                                    value: unit,
+                                    child: Text(_getUnitLabel(unit)),
+                                  );
+                                }).toList(),
+                                onChanged: isLoading
+                                    ? null
+                                    : (value) {
+                                        setState(() => _selectedUnit = value!);
+                                      },
+                                theme: theme,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _barcodeController,
+                                label: 'بارکد (اختیاری)',
+                                hint: '1234567890',
+                                keyboardType: TextInputType.number,
+                                enabled: !isLoading,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _skuController,
+                                label: 'SKU (اختیاری)',
+                                hint: 'SKU-001',
+                                enabled: !isLoading,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _loadingCategories
+                                  ? const Center(
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : _buildDropdown<ProductCategory?>(
+                                      label: 'دسته‌بندی (اختیاری)',
+                                      value: _selectedCategory,
+                                      items: [
+                                        DropdownMenuItem<ProductCategory?>(
+                                          value: null,
+                                          child: Text(
+                                            'دسته‌بندی نشده',
+                                            style: TextStyle(
+                                              color: theme.colorScheme.outline,
+                                            ),
+                                          ),
+                                        ),
+                                        ..._categories.map((cat) {
+                                          return DropdownMenuItem<
+                                            ProductCategory?
+                                          >(value: cat, child: Text(cat.name));
+                                        }).toList(),
+                                      ],
+                                      onChanged: isLoading
+                                          ? null
+                                          : (value) {
+                                              setState(
+                                                () => _selectedCategory = value,
+                                              );
+                                            },
+                                      theme: theme,
+                                    ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _brandController,
+                                label: 'برند (اختیاری)',
+                                hint: 'ASUS',
+                                enabled: !isLoading,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // Images Section
+                        _buildSectionTitle('تصاویر محصول', theme),
+                        const SizedBox(height: 16),
+                        ProductImagePicker(
+                          productId: widget.product?.id,
+                          mainImageUrl: widget.product?.mainImage,
+                          imageUrls: widget.product?.images,
+                          enabled: !isLoading && !_uploadingImages,
+                          onMainImageChanged: (file) {
+                            setState(() => _mainImageFile = file);
+                          },
+                          onImagesChanged: (files) {
+                            setState(() => _additionalImageFiles = files);
+                          },
+                          onMainImageBytesChanged: (bytes) {
+                            setState(() => _mainImageBytes = bytes);
+                          },
+                          onImagesBytesChanged: (bytesList) {
+                            setState(() => _additionalImageBytes = bytesList);
+                          },
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // Pricing Section
+                        _buildSectionTitle('قیمت‌گذاری', theme),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _purchasePriceController,
+                                label: 'قیمت خرید',
+                                hint: '1000000',
+                                keyboardType: TextInputType.number,
+                                validator: (value) => value?.isEmpty ?? true
+                                    ? 'الزامی است'
+                                    : null,
+                                enabled: !isLoading,
+                                suffix: Text(
+                                  'تومان',
+                                  style: TextStyle(fontSize: 12),
                                 ),
                               ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _salePriceController,
+                                label: 'قیمت فروش',
+                                hint: '1200000',
+                                keyboardType: TextInputType.number,
+                                validator: (value) => value?.isEmpty ?? true
+                                    ? 'الزامی است'
+                                    : null,
+                                enabled: !isLoading,
+                                suffix: Text(
+                                  'تومان',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _wholesalePriceController,
+                                label: 'قیمت عمده (اختیاری)',
+                                hint: '1100000',
+                                keyboardType: TextInputType.number,
+                                enabled: !isLoading,
+                                suffix: Text(
+                                  'تومان',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _taxRateController,
+                                label: 'مالیات (%)',
+                                hint: '9',
+                                keyboardType: TextInputType.number,
+                                enabled: !isLoading,
+                                suffix: Text(
+                                  '%',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // Inventory Section
+                        _buildSectionTitle('موجودی', theme),
+                        const SizedBox(height: 16),
+                        SwitchListTile(
+                          title: Text('این محصول دارای تنوع است'),
+                          subtitle: Text(
+                            'محصولات با تنوع دارای رنگ، سایز یا سایر ویژگی‌ها هستند',
+                          ),
+                          value: _hasVariants,
+                          onChanged: isLoading
+                              ? null
+                              : (value) {
+                                  setState(() => _hasVariants = value);
+                                },
+                          contentPadding: EdgeInsets.zero,
+                        ),
+
+                        if (!_hasVariants) ...[
+                          const SizedBox(height: 8),
+
+                          SwitchListTile(
+                            title: Text('ردیابی موجودی'),
+                            value: _trackInventory,
+                            onChanged: isLoading
+                                ? null
+                                : (value) {
+                                    setState(() => _trackInventory = value);
+                                  },
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          const SizedBox(height: 16),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildTextField(
+                                  controller: _currentStockController,
+                                  label: 'موجودی فعلی',
+                                  hint: '100',
+                                  keyboardType: TextInputType.number,
+                                  enabled:
+                                      !isLoading &&
+                                      _trackInventory &&
+                                      !_hasVariants,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildTextField(
+                                  controller: _minStockController,
+                                  label: 'حداقل موجودی',
+                                  hint: '10',
+                                  keyboardType: TextInputType.number,
+                                  enabled:
+                                      !isLoading &&
+                                      _trackInventory &&
+                                      !_hasVariants,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildTextField(
+                                  controller: _maxStockController,
+                                  label: 'حداکثر موجودی (اختیاری)',
+                                  hint: '1000',
+                                  keyboardType: TextInputType.number,
+                                  enabled:
+                                      !isLoading &&
+                                      _trackInventory &&
+                                      !_hasVariants,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildTextField(
+                                  controller: _reorderPointController,
+                                  label: 'نقطه سفارش (اختیاری)',
+                                  hint: '20',
+                                  keyboardType: TextInputType.number,
+                                  enabled:
+                                      !isLoading &&
+                                      _trackInventory &&
+                                      !_hasVariants,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 32),
+
+                        // Additional Info Section
+                        _buildSectionTitle('اطلاعات تکمیلی', theme),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _supplierController,
+                                label: 'تامین‌کننده (اختیاری)',
+                                hint: 'شرکت ABC',
+                                enabled: !isLoading,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _weightController,
+                                label: 'وزن/کیلوگرم (اختیاری)',
+                                hint: '2.5',
+                                keyboardType: TextInputType.number,
+                                enabled: !isLoading,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        _buildTextField(
+                          controller: _notesController,
+                          label: 'یادداشت‌ها (اختیاری)',
+                          hint: 'یادداشت‌های داخلی...',
+                          maxLines: 3,
+                          enabled: !isLoading,
+                        ),
+
+                        const SizedBox(height: 32),
+
+                        // Save Button
+                        SizedBox(
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: isLoading ? null : _saveProduct,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.colorScheme.primary,
+                              foregroundColor: theme.colorScheme.onPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: isLoading
+                                ? SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation(
+                                        theme.colorScheme.onPrimary,
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    widget.product != null
+                                        ? 'بروزرسانی محصول'
+                                        : 'ذخیره محصول',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
                     ),
                   ),
-                  
+
                   // Tab 2: ویژگی‌ها و تنوع
                   widget.product?.id == null
                       ? Center(
@@ -715,7 +917,9 @@ class _ProductFormPageState extends State<ProductFormPage> with SingleTickerProv
                       : ProductAttributesTab(
                           productId: widget.product!.id,
                           businessId: widget.businessId,
-                          productName: _nameController.text.isNotEmpty ? _nameController.text : (widget.product?.name ?? 'محصول'),
+                          productName: _nameController.text.isNotEmpty
+                              ? _nameController.text
+                              : (widget.product?.name ?? 'محصول'),
                           hasVariants: _hasVariants,
                           onHasVariantsChanged: (value) {
                             setState(() => _hasVariants = value);

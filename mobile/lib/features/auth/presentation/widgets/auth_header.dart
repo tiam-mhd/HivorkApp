@@ -27,14 +27,7 @@ class AuthHeader extends StatelessWidget {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  theme.colorScheme.primary,
-                  theme.colorScheme.primaryContainer,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: theme.colorScheme.primary,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(

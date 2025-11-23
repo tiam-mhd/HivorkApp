@@ -30,6 +30,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   List<ProductVariant> _variants = [];
   bool _isLoadingVariants = false;
   bool _hasLoadedVariants = false; // Track if we've attempted to load
+  int _currentImageIndex = 0; // Track current image in gallery
+  PageController? _imagePageController; // Controller for image PageView
 
   @override
   void initState() {
@@ -43,6 +45,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   @override
   void dispose() {
     _productBloc.close();
+    _imagePageController?.dispose();
     super.dispose();
   }
 
@@ -332,64 +335,267 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
               final product = state.product;
 
+              // ترکیب همه عکس‌ها
+              final allImages = <String>[];
+              if (product.mainImage != null) {
+                print('🖼️ [FLUTTER] MainImage: ${product.mainImage}');
+                allImages.add(product.mainImage!);
+              }
+              if (product.images != null && product.images!.isNotEmpty) {
+                print('🖼️ [FLUTTER] Additional Images: ${product.images}');
+                allImages.addAll(product.images!);
+              }
+              print('🖼️ [FLUTTER] All Images Combined: $allImages');
+              final hasImages = allImages.isNotEmpty;
+
+              // Initialize PageController if images exist
+              if (hasImages && _imagePageController == null) {
+                _imagePageController = PageController(initialPage: 0);
+              }
+
               return CustomScrollView(
                 slivers: [
-                  // AppBar with Image
-                  SliverAppBar(
-                    expandedHeight: 300,
-                    pinned: true,
-                    backgroundColor: theme.scaffoldBackgroundColor,
-                    flexibleSpace: FlexibleSpaceBar(
-                      background: product.mainImage != null
-                          ? Image.network(
-                              product.mainImage!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: theme.colorScheme.surfaceVariant,
-                                  child: Icon(
-                                    Icons.inventory_2_outlined,
-                                    size: 80,
-                                    color: theme.colorScheme.onSurface.withOpacity(0.3),
+                  // AppBar with Image Gallery
+                  if (hasImages)
+                    SliverAppBar(
+                      expandedHeight: 300,
+                      pinned: true,
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      flexibleSpace: FlexibleSpaceBar(
+                        background: Stack(
+                          children: [
+                            // PageView for images
+                            PageView.builder(
+                              controller: _imagePageController,
+                              itemCount: allImages.length,
+                              onPageChanged: (index) {
+                                if (mounted) {
+                                  setState(() => _currentImageIndex = index);
+                                }
+                              },
+                              itemBuilder: (context, index) {
+                                final imageUrl = allImages[index];
+                                print('🖼️ [FLUTTER] Loading image at index $index: $imageUrl');
+                                return GestureDetector(
+                                  onTap: () => _showImageViewer(context, allImages, index),
+                                  child: Image.network(
+                                    imageUrl,
+                                    fit: BoxFit.cover,
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) {
+                                        print('✅ [FLUTTER] Image loaded successfully: $imageUrl');
+                                        return child;
+                                      }
+                                      print('⏳ [FLUTTER] Loading progress for $imageUrl: ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}');
+                                      return Center(
+                                        child: CircularProgressIndicator(
+                                          value: loadingProgress.expectedTotalBytes != null
+                                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                              : null,
+                                        ),
+                                      );
+                                    },
+                                    errorBuilder: (context, error, stackTrace) {
+                                      print('❌ [FLUTTER] Error loading image $imageUrl: $error');
+                                      print('❌ [FLUTTER] StackTrace: $stackTrace');
+                                      return Container(
+                                        color: theme.colorScheme.surfaceVariant,
+                                        child: Icon(
+                                          Icons.broken_image_outlined,
+                                          size: 80,
+                                          color: theme.colorScheme.onSurface.withOpacity(0.3),
+                                        ),
+                                      );
+                                    },
                                   ),
                                 );
                               },
-                            )
-                          : Container(
-                              color: theme.colorScheme.surfaceVariant,
-                              child: Icon(
-                                Icons.inventory_2_outlined,
-                                size: 80,
-                                color: theme.colorScheme.onSurface.withOpacity(0.3),
+                            ),
+                            // Gradient overlay for AppBar visibility
+                            Positioned(
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              child: Container(
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.black.withOpacity(0.5),
+                                      Colors.black.withOpacity(0.2),
+                                      Colors.transparent,
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
-                    ),
-                    actions: [
-                      IconButton(
-                        icon: Icon(Icons.edit),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ProductFormPage(
-                                businessId: product.businessId,
-                                product: product,
+                            // Page indicator
+                            if (allImages.length > 1)
+                              Positioned(
+                                bottom: 16,
+                                left: 0,
+                                right: 0,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: List.generate(
+                                    allImages.length,
+                                    (index) => Container(
+                                      width: 8,
+                                      height: 8,
+                                      margin: EdgeInsets.symmetric(horizontal: 4),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: _currentImageIndex == index
+                                            ? Colors.white
+                                            : Colors.white.withOpacity(0.4),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.3),
+                                            blurRadius: 4,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ).then((result) {
-                            if (result == true) {
-                              // Reload product
-                              _productBloc.add(LoadProductById(widget.productId));
+                          ],
+                        ),
+                      ),
+                      actions: [
+                        IconButton(
+                          icon: Icon(Icons.refresh),
+                          tooltip: 'بازخوانی',
+                          onPressed: () {
+                            _productBloc.add(LoadProductById(widget.productId));
+                            // Reset variants state to reload them too
+                            if (mounted) {
+                              setState(() {
+                                _hasLoadedVariants = false;
+                                _variants = [];
+                                _currentImageIndex = 0;
+                                _imagePageController?.dispose();
+                                _imagePageController = null;
+                              });
                             }
-                          });
-                        },
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.delete_outline),
-                        onPressed: () => _showDeleteDialog(product),
-                      ),
-                    ],
-                  ),
+                          },
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.edit),
+                          tooltip: 'ویرایش',
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ProductFormPage(
+                                  businessId: product.businessId,
+                                  product: product,
+                                ),
+                              ),
+                            ).then((result) {
+                              if (result == true) {
+                                // Reload product
+                                _productBloc.add(LoadProductById(widget.productId));
+                              }
+                            });
+                          },
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.delete_outline),
+                          tooltip: 'حذف',
+                          onPressed: () => _showDeleteDialog(product),
+                        ),
+                      ],
+                    )
+                  else
+                    SliverAppBar(
+                      pinned: true,
+                      backgroundColor: theme.scaffoldBackgroundColor,
+                      actions: [
+                        IconButton(
+                          icon: Icon(Icons.refresh),
+                          tooltip: 'بازخوانی',
+                          onPressed: () {
+                            _productBloc.add(LoadProductById(widget.productId));
+                            setState(() {
+                              _hasLoadedVariants = false;
+                              _variants = [];
+                            });
+                          },
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.edit),
+                          tooltip: 'ویرایش',
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ProductFormPage(
+                                  businessId: product.businessId,
+                                  product: product,
+                                ),
+                              ),
+                            ).then((result) {
+                              if (result == true) {
+                                _productBloc.add(LoadProductById(widget.productId));
+                              }
+                            });
+                          },
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.delete_outline),
+                          tooltip: 'حذف',
+                          onPressed: () => _showDeleteDialog(product),
+                        ),
+                      ],
+                      // Badge for main image - below the actions
+                      bottom: (_currentImageIndex == 0 && product.mainImage != null)
+                          ? PreferredSize(
+                              preferredSize: Size.fromHeight(40),
+                              child: Container(
+                                alignment: Alignment.centerRight,
+                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primary,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.star,
+                                        size: 16,
+                                        color: Colors.white,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'عکس اصلی',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
 
                   // Content
                   SliverToBoxAdapter(
@@ -1066,19 +1272,38 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     final colors = <String>{};
     
     variant.attributes.forEach((key, value) {
-      if (key.toLowerCase() == 'color' || key == 'رنگ') {
-        if (value is List) {
-          for (final item in value) {
-            final str = item.toString();
-            if (str.startsWith('#') && str.length == 7) {
-              colors.add(str.toLowerCase());
-            }
+      // value می‌تواند string یا list باشد
+      final List<String> valuesToCheck = [];
+      
+      if (value is String) {
+        valuesToCheck.add(value);
+      } else if (value is List) {
+        valuesToCheck.addAll(value.map((v) => v.toString()));
+      } else {
+        valuesToCheck.add(value.toString());
+      }
+      
+      // چک کردن هر value
+      for (final val in valuesToCheck) {
+        // فرمت: "value|label" یا مستقیم "#RRGGBB"
+        String? colorCode;
+        
+        if (val.contains('|')) {
+          // فرمت: "#ff0000|قرمز"
+          final parts = val.split('|');
+          if (parts.isNotEmpty) {
+            colorCode = parts[0].trim();
           }
         } else {
-          final str = value.toString();
-          if (str.startsWith('#') && str.length == 7) {
-            colors.add(str.toLowerCase());
-          }
+          // مستقیم: "#ff0000"
+          colorCode = val.trim();
+        }
+        
+        // اگر hex color معتبر بود اضافه کن
+        if (colorCode != null && 
+            colorCode.startsWith('#') && 
+            (colorCode.length == 7 || colorCode.length == 9)) {
+          colors.add(colorCode);
         }
       }
     });
@@ -1086,16 +1311,46 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     return colors.toList();
   }
 
+  void _showImageViewer(BuildContext context, List<String> images, int initialIndex) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _ImageViewerPage(
+          images: images,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
+
   Color _parseVariantColor(String colorCode) {
     try {
-      return Color(int.parse(colorCode.substring(1), radix: 16) + 0xFF000000);
+      // حذف # از ابتدا
+      final hexString = colorCode.replaceFirst('#', '');
+      
+      if (hexString.length == 6) {
+        // فرمت RGB: #RRGGBB -> 0xFFRRGGBB
+        return Color(int.parse('FF$hexString', radix: 16));
+      } else if (hexString.length == 8) {
+        // فرمت ARGB: #AARRGGBB
+        return Color(int.parse(hexString, radix: 16));
+      }
+      
+      return Colors.grey;
     } catch (e) {
+      print('❌ [COLOR_PARSE] Failed to parse color: $colorCode - Error: $e');
       return Colors.grey;
     }
   }
 
   String _formatVariantName(String name) {
-    return name.replaceAll(RegExp(r'#[0-9a-fA-F]{6}'), '').trim();
+    // حذف hex color codes از نام
+    // مثال: "قرمز #ff0000" -> "قرمز"
+    // مثال: "#ff0000|قرمز - L" -> "قرمز - L"
+    return name
+        .replaceAll(RegExp(r'#[0-9a-fA-F]{6,8}'), '') // حذف hex codes
+        .replaceAll(RegExp(r'\s*\|\s*'), ' ') // تبدیل | به space
+        .replaceAll(RegExp(r'\s+'), ' ') // حذف space های اضافی
+        .trim();
   }
 
   Color _getVariantStatusColor(VariantStatus status, bool isDark) {
@@ -1109,5 +1364,87 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       case VariantStatus.discontinued:
         return isDark ? Colors.grey.shade400 : Colors.grey.shade600;
     }
+  }
+}
+
+class _ImageViewerPage extends StatefulWidget {
+  final List<String> images;
+  final int initialIndex;
+
+  const _ImageViewerPage({
+    required this.images,
+    required this.initialIndex,
+  });
+
+  @override
+  State<_ImageViewerPage> createState() => _ImageViewerPageState();
+}
+
+class _ImageViewerPageState extends State<_ImageViewerPage> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: IconThemeData(color: Colors.white),
+        title: Text(
+          '${_currentIndex + 1} از ${widget.images.length}',
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: widget.images.length,
+        onPageChanged: (index) {
+          setState(() => _currentIndex = index);
+        },
+        itemBuilder: (context, index) {
+          return InteractiveViewer(
+            child: Center(
+              child: Image.network(
+                widget.images[index],
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.broken_image_outlined,
+                          size: 64,
+                          color: Colors.white54,
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'خطا در بارگذاری تصویر',
+                          style: TextStyle(color: Colors.white54),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }

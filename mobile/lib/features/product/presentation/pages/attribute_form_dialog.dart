@@ -525,19 +525,7 @@ class _AttributeFormDialogState extends State<AttributeFormDialog> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
-                      // Help Text
-                      TextFormField(
-                        controller: _helpTextController,
-                        decoration: const InputDecoration(
-                          labelText: 'متن راهنما',
-                          hintText: 'راهنمایی برای کاربر',
-                          prefixIcon: Icon(Icons.help_outline),
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 24),
-                      
+                                            
                       // Type Configuration Section
                       _SectionHeader(
                         icon: Icons.settings,

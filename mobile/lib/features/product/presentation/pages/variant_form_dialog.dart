@@ -1,3 +1,5 @@
+import 'package:universal_io/io.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../data/models/attribute_enums.dart';
@@ -6,6 +8,8 @@ import '../../data/models/product_variant.dart';
 import '../../data/services/attribute_api_service.dart';
 import '../../data/services/product_attribute_value_api_service.dart';
 import '../../data/services/variant_api_service.dart';
+import '../../data/services/image_upload_service.dart';
+import '../widgets/variant_image_manager.dart';
 
 class VariantFormDialog extends StatefulWidget {
   final String productId;
@@ -39,9 +43,20 @@ class _VariantFormDialogState extends State<VariantFormDialog> {
   Map<String, List<String>> _productAttributeValues = {}; // مقادیر محصول
   Map<String, dynamic> _selectedAttributeValues = {};
 
+  // Images
+  File? _mainImageFile;
+  List<File> _additionalImageFiles = [];
+  Uint8List? _mainImageBytes; // برای وب
+  List<Uint8List> _additionalImageBytes = []; // برای وب
+  late ImageUploadService _imageUploadService;
+  bool _uploadingImages = false;
+
   @override
   void initState() {
     super.initState();
+    
+    final dio = ServiceLocator().dio;
+    _imageUploadService = ImageUploadService(dio);
     
     _nameController = TextEditingController(text: widget.variant?.name ?? '');
     _skuController = TextEditingController(text: widget.variant?.sku ?? '');
@@ -144,9 +159,21 @@ class _VariantFormDialogState extends State<VariantFormDialog> {
       }
 
       if (widget.variant != null) {
+        // ویرایش تنوع
         await variantService.updateVariant(widget.productId, widget.variant!.id, data);
+        
+        // آپلود عکس‌ها بعد از ویرایش
+        if (_mainImageFile != null || _additionalImageFiles.isNotEmpty) {
+          await _uploadVariantImages(widget.variant!.id);
+        }
       } else {
-        await variantService.createVariant(widget.productId, data);
+        // ایجاد تنوع جدید
+        final result = await variantService.createVariant(widget.productId, data);
+        
+        // اگر عکس داریم، آپلود کن
+        if (_mainImageFile != null || _additionalImageFiles.isNotEmpty) {
+          await _uploadVariantImages(result.id);
+        }
       }
 
       if (mounted) {
@@ -163,6 +190,43 @@ class _VariantFormDialogState extends State<VariantFormDialog> {
           SnackBar(content: Text('خطا: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _uploadVariantImages(String variantId) async {
+    setState(() => _uploadingImages = true);
+
+    try {
+      // آپلود عکس اصلی
+      if (_mainImageFile != null) {
+        await _imageUploadService.uploadVariantMainImage(
+          productId: widget.productId,
+          variantId: variantId,
+          imageFile: _mainImageFile!,
+          imageBytes: _mainImageBytes, // پاس دادن bytes برای وب
+        );
+      }
+
+      // آپلود عکس‌های اضافی
+      if (_additionalImageFiles.isNotEmpty) {
+        await _imageUploadService.uploadVariantImages(
+          productId: widget.productId,
+          variantId: variantId,
+          imageFiles: _additionalImageFiles,
+          imageBytesList: _additionalImageBytes, // پاس دادن bytes برای وب
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در آپلود تصاویر: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _uploadingImages = false);
     }
   }
 
@@ -274,6 +338,27 @@ class _VariantFormDialogState extends State<VariantFormDialog> {
                               suffixText: 'تومان',
                             ),
                             keyboardType: TextInputType.number,
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Images Section
+                          VariantImageManager(
+                            variantId: widget.variant?.id,
+                            mainImageUrl: widget.variant?.mainImage,
+                            imageUrls: widget.variant?.images,
+                            enabled: !_isLoading && !_uploadingImages,
+                            onMainImageChanged: (file) {
+                              setState(() => _mainImageFile = file);
+                            },
+                            onImagesChanged: (files) {
+                              setState(() => _additionalImageFiles = files);
+                            },
+                            onMainImageBytesChanged: (bytes) {
+                              setState(() => _mainImageBytes = bytes);
+                            },
+                            onImagesBytesChanged: (bytesList) {
+                              setState(() => _additionalImageBytes = bytesList);
+                            },
                           ),
                         ],
                       ),

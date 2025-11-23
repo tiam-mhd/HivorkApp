@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:hivork_app/core/theme/app_theme_v2.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
@@ -373,8 +374,8 @@ class _HivorkAppState extends State<HivorkApp> {
               debugShowCheckedModeBanner: false,
               
               // Theme - Controlled by ThemeNotifier
-              theme: AppTheme.lightTheme,
-              darkTheme: AppTheme.darkTheme,
+              theme: AppThemeV2.lightTheme,
+              darkTheme: AppThemeV2.darkTheme,
               themeMode: themeNotifier.themeMode,
               
               // Localization

@@ -1,4 +1,5 @@
 import 'package:json_annotation/json_annotation.dart';
+import 'product_variant.dart';
 
 part 'product.g.dart';
 
@@ -158,6 +159,8 @@ class Product {
   @NullableStringToDoubleConverter()
   @JsonKey(name: 'totalStock')
   final double? totalStock;
+  // Variant objects loaded from backend when fetching single product
+  final List<ProductVariant>? variants;
 
   // Images
   @JsonKey(name: 'mainImage')
@@ -211,6 +214,7 @@ class Product {
     required this.trackInventory,
     required this.hasVariants,
     this.totalStock,
+    this.variants,
     this.mainImage,
     this.images,
     this.supplier,
@@ -256,6 +260,7 @@ class Product {
     bool? trackInventory,
     bool? hasVariants,
     double? totalStock,
+    List<ProductVariant>? variants,
     String? mainImage,
     List<String>? images,
     String? supplier,
@@ -295,6 +300,7 @@ class Product {
       trackInventory: trackInventory ?? this.trackInventory,
       hasVariants: hasVariants ?? this.hasVariants,
       totalStock: totalStock ?? this.totalStock,
+      variants: variants ?? this.variants,
       mainImage: mainImage ?? this.mainImage,
       images: images ?? this.images,
       supplier: supplier ?? this.supplier,

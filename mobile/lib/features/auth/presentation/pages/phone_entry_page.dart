@@ -117,21 +117,28 @@ class _PhoneEntryPageState extends State<PhoneEntryPage>
                             Container(
                               width: 80,
                               height: 80,
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primary,
-                                borderRadius: BorderRadius.circular(24),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: theme.colorScheme.primary.withOpacity(0.3),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                Icons.business_center_rounded,
-                                size: 40,
-                                color: theme.colorScheme.onPrimary,
+                              // decoration: BoxDecoration(
+                              // color: theme.colorScheme.primary,
+                              // borderRadius: BorderRadius.circular(24),
+                              //   boxShadow: [
+                              //     BoxShadow(
+                              //       color: theme.colorScheme.primary
+                              //           .withOpacity(0.3),
+                              //       blurRadius: 20,
+                              //       offset: const Offset(0, 10),
+                              //     ),
+                              //   ],
+                              // ),
+                              // child: Icon(
+                              //   Icons.business_center_rounded,
+                              //   size: 40,
+                              //   color: theme.colorScheme.onPrimary,
+                              // ),
+                              child: Image.asset(
+                                'assets/images/branding/Logo.png',
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.contain,
                               ),
                             ),
                             const SizedBox(height: 24),
@@ -198,7 +205,8 @@ class _PhoneEntryPageState extends State<PhoneEntryPage>
                                     borderRadius: BorderRadius.circular(16),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: theme.colorScheme.shadow.withOpacity(0.1),
+                                        color: theme.colorScheme.shadow
+                                            .withOpacity(0.1),
                                         blurRadius: 10,
                                         offset: const Offset(0, 4),
                                       ),
@@ -220,7 +228,10 @@ class _PhoneEntryPageState extends State<PhoneEntryPage>
                                     decoration: InputDecoration(
                                       hintText: '09123456789',
                                       hintStyle: TextStyle(
-                                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
+                                        color: theme
+                                            .colorScheme
+                                            .onSurfaceVariant
+                                            .withOpacity(0.5),
                                         fontWeight: FontWeight.normal,
                                       ),
                                       hintTextDirection: TextDirection.ltr,
@@ -228,9 +239,8 @@ class _PhoneEntryPageState extends State<PhoneEntryPage>
                                         margin: const EdgeInsets.all(12),
                                         padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
-                                          color: theme.colorScheme.primary.withOpacity(
-                                            0.1,
-                                          ),
+                                          color: theme.colorScheme.primary
+                                              .withOpacity(0.1),
                                           borderRadius: BorderRadius.circular(
                                             12,
                                           ),
@@ -322,7 +332,11 @@ class _PhoneEntryPageState extends State<PhoneEntryPage>
                                                   valueColor:
                                                       AlwaysStoppedAnimation<
                                                         Color
-                                                      >(theme.colorScheme.onPrimary),
+                                                      >(
+                                                        theme
+                                                            .colorScheme
+                                                            .onPrimary,
+                                                      ),
                                                 ),
                                               )
                                             : Row(
@@ -335,13 +349,17 @@ class _PhoneEntryPageState extends State<PhoneEntryPage>
                                                       fontSize: 18,
                                                       fontWeight:
                                                           FontWeight.bold,
-                                                      color: theme.colorScheme.onPrimary,
+                                                      color: theme
+                                                          .colorScheme
+                                                          .onPrimary,
                                                     ),
                                                   ),
                                                   const SizedBox(width: 8),
                                                   Icon(
                                                     Icons.arrow_back_rounded,
-                                                    color: theme.colorScheme.onPrimary,
+                                                    color: theme
+                                                        .colorScheme
+                                                        .onPrimary,
                                                   ),
                                                 ],
                                               ),

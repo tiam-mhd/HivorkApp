@@ -17,11 +17,15 @@ import 'customer_groups_management_page.dart';
 class CustomersPage extends StatefulWidget {
   final String businessId;
   final CustomerFilter? initialFilter;
+  final bool selectionMode; // برای حالت انتخاب مشتری در فاکتور
+  final Customer? selectedCustomer; // مشتری انتخاب شده قبلی
 
   const CustomersPage({
     Key? key,
     required this.businessId,
     this.initialFilter,
+    this.selectionMode = false,
+    this.selectedCustomer,
   }) : super(key: key);
 
   @override
@@ -76,11 +80,14 @@ class _CustomersPageState extends State<CustomersPage> {
   void _onGroupSelected(String? groupId) {
     setState(() {
       _selectedGroupId = groupId;
-      if (groupId == null) {
-        _currentFilter = _currentFilter?.copyWith(groupId: null) ?? CustomerFilter();
+      if (groupId == null || groupId == 'all') {
+        // همه مشتریان
+        _currentFilter = _currentFilter?.copyWith(groupId: 'all') ?? CustomerFilter(groupId: 'all');
       } else if (groupId == 'null') {
+        // عمومی (بدون گروه)
         _currentFilter = (_currentFilter ?? CustomerFilter()).copyWith(groupId: 'null');
       } else {
+        // گروه خاص
         _currentFilter = (_currentFilter ?? CustomerFilter()).copyWith(groupId: groupId);
       }
     });
@@ -108,39 +115,63 @@ class _CustomersPageState extends State<CustomersPage> {
       value: _customerBloc,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('مشتریان'),
-          actions: [
-            // گروه‌بندی
-            IconButton(
-              icon: const Icon(Icons.folder_special),
-              tooltip: 'مدیریت گروه‌بندی',
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CustomerGroupsManagementPage(
-                      businessId: widget.businessId,
-                    ),
+          title: Text(widget.selectionMode ? 'انتخاب مشتری' : 'مشتریان'),
+          actions: widget.selectionMode 
+              ? [
+                  // در حالت انتخاب فقط دکمه افزودن مشتری جدید
+                  IconButton(
+                    icon: const Icon(Icons.add_rounded),
+                    tooltip: 'مشتری جدید',
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CustomerFormPage(
+                            businessId: widget.businessId,
+                          ),
+                        ),
+                      );
+                      if (result == true) {
+                        _customerBloc.add(LoadCustomers(
+                          businessId: widget.businessId,
+                          filter: _currentFilter,
+                        ));
+                      }
+                    },
                   ),
-                );
-                _loadGroups();
-                _customerBloc.add(LoadCustomers(
-                  businessId: widget.businessId,
-                  filter: _currentFilter,
-                ));
-              },
-            ),
-            // جستجو
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: _showSearchDialog,
-            ),
-            // فیلتر
-            IconButton(
-              icon: const Icon(Icons.filter_list),
-              onPressed: _showFilterDialog,
-            ),
-          ],
+                ]
+              : [
+                  // گروه‌بندی
+                  IconButton(
+                    icon: const Icon(Icons.folder_special),
+                    tooltip: 'مدیریت گروه‌بندی',
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CustomerGroupsManagementPage(
+                            businessId: widget.businessId,
+                          ),
+                        ),
+                      );
+                      _loadGroups();
+                      _customerBloc.add(LoadCustomers(
+                        businessId: widget.businessId,
+                        filter: _currentFilter,
+                      ));
+                    },
+                  ),
+                  // جستجو
+                  IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: _showSearchDialog,
+                  ),
+                  // فیلتر
+                  IconButton(
+                    icon: const Icon(Icons.filter_list),
+                    onPressed: _showFilterDialog,
+                  ),
+                ],
         ),
         body: Column(
           children: [
@@ -157,8 +188,8 @@ class _CustomersPageState extends State<CustomersPage> {
                       padding: const EdgeInsets.only(left: 8),
                       child: FilterChip(
                         label: const Text('همه'),
-                        selected: _selectedGroupId == null,
-                        onSelected: (_) => _onGroupSelected(null),
+                        selected: _selectedGroupId == null || _selectedGroupId == 'all',
+                        onSelected: (_) => _onGroupSelected('all'),
                       ),
                     ),
                     // عمومی (بدون گروه)
@@ -280,7 +311,17 @@ class _CustomersPageState extends State<CustomersPage> {
                           final customer = state.customers[index];
                           return CustomerListItem(
                             customer: customer,
-                            onTap: () => _navigateToDetail(customer),
+                            selectionMode: widget.selectionMode,
+                            isSelected: widget.selectedCustomer?.id == customer.id,
+                            onTap: () {
+                              if (widget.selectionMode) {
+                                // در حالت انتخاب، مشتری را برگردان
+                                Navigator.pop(context, customer);
+                              } else {
+                                // در حالت عادی، به صفحه جزئیات برو
+                                _navigateToDetail(customer);
+                              }
+                            },
                             onEdit: () => _navigateToEdit(customer),
                             onDelete: () => _confirmDelete(customer),
                           );
@@ -295,10 +336,12 @@ class _CustomersPageState extends State<CustomersPage> {
             ),
           ],
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _navigateToCreate,
-          child: const Icon(Icons.add),
-        ),
+        floatingActionButton: widget.selectionMode 
+            ? null
+            : FloatingActionButton(
+                onPressed: _navigateToCreate,
+                child: const Icon(Icons.add),
+              ),
       ),
     );
   }
@@ -362,9 +405,19 @@ class _CustomersPageState extends State<CustomersPage> {
   }
 
   void _showFilterDialog() {
-    // TODO: Implement advanced filter dialog
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('فیلتر پیشرفته به زودی...')),
+    showDialog(
+      context: context,
+      builder: (context) => _FilterDialog(
+        currentFilter: _currentFilter ?? CustomerFilter(),
+        groups: _groups,
+        onApply: (filter) {
+          setState(() => _currentFilter = filter);
+          _customerBloc.add(LoadCustomers(
+            businessId: widget.businessId,
+            filter: _currentFilter,
+          ));
+        },
+      ),
     );
   }
 
@@ -454,6 +507,183 @@ class _CustomersPageState extends State<CustomersPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// Filter Dialog Widget
+class _FilterDialog extends StatefulWidget {
+  final CustomerFilter currentFilter;
+  final List<CustomerGroup> groups;
+  final Function(CustomerFilter) onApply;
+
+  const _FilterDialog({
+    Key? key,
+    required this.currentFilter,
+    required this.groups,
+    required this.onApply,
+  }) : super(key: key);
+
+  @override
+  State<_FilterDialog> createState() => _FilterDialogState();
+}
+
+class _FilterDialogState extends State<_FilterDialog> {
+  late String? _type;
+  late String? _status;
+  late String? _groupId;
+  late bool? _hasDebt;
+  late bool? _hasCredit;
+
+  @override
+  void initState() {
+    super.initState();
+    _type = widget.currentFilter.type;
+    _status = widget.currentFilter.status;
+    _groupId = widget.currentFilter.groupId;
+    _hasDebt = widget.currentFilter.hasDebt;
+    _hasCredit = widget.currentFilter.hasCredit;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('فیلترهای پیشرفته'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Type Filter
+            const Text('نوع:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                FilterChip(
+                  label: const Text('همه'),
+                  selected: _type == null,
+                  onSelected: (_) => setState(() => _type = null),
+                ),
+                FilterChip(
+                  label: const Text('شخصی'),
+                  selected: _type == 'individual',
+                  onSelected: (_) => setState(() => _type = 'individual'),
+                ),
+                FilterChip(
+                  label: const Text('شرکتی'),
+                  selected: _type == 'company',
+                  onSelected: (_) => setState(() => _type = 'company'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Status Filter
+            const Text('وضعیت:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                FilterChip(
+                  label: const Text('همه'),
+                  selected: _status == null,
+                  onSelected: (_) => setState(() => _status = null),
+                ),
+                FilterChip(
+                  label: const Text('فعال'),
+                  selected: _status == 'active',
+                  onSelected: (_) => setState(() => _status = 'active'),
+                ),
+                FilterChip(
+                  label: const Text('غیرفعال'),
+                  selected: _status == 'inactive',
+                  onSelected: (_) => setState(() => _status = 'inactive'),
+                ),
+                FilterChip(
+                  label: const Text('مسدود'),
+                  selected: _status == 'blocked',
+                  onSelected: (_) => setState(() => _status = 'blocked'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Group Filter
+            const Text('گروه:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String?>(
+              value: _groupId,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('همه')),
+                const DropdownMenuItem(value: 'null', child: Text('عمومی')),
+                ...widget.groups.map((g) => DropdownMenuItem(
+                  value: g.id,
+                  child: Text(g.name),
+                )),
+              ],
+              onChanged: (value) => setState(() => _groupId = value),
+            ),
+            const SizedBox(height: 16),
+
+            // Financial Filters
+            const Text('مالی:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              title: const Text('دارای بدهی'),
+              value: _hasDebt ?? false,
+              contentPadding: EdgeInsets.zero,
+              onChanged: (value) => setState(() => _hasDebt = value),
+            ),
+            CheckboxListTile(
+              title: const Text('دارای اعتبار'),
+              value: _hasCredit ?? false,
+              contentPadding: EdgeInsets.zero,
+              onChanged: (value) => setState(() => _hasCredit = value),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            // Clear all filters
+            setState(() {
+              _type = null;
+              _status = null;
+              _groupId = null;
+              _hasDebt = null;
+              _hasCredit = null;
+            });
+            final clearedFilter = CustomerFilter();
+            widget.onApply(clearedFilter);
+            Navigator.pop(context);
+          },
+          child: const Text('پاک کردن همه'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('انصراف'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final filter = widget.currentFilter.copyWith(
+              type: _type,
+              status: _status,
+              groupId: _groupId,
+              hasDebt: _hasDebt,
+              hasCredit: _hasCredit,
+            );
+            widget.onApply(filter);
+            Navigator.pop(context);
+          },
+          child: const Text('اعمال'),
+        ),
+      ],
     );
   }
 }

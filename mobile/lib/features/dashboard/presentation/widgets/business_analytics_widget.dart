@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:hivork_app/features/invoice/presentation/pages/invoice_list_screen.dart';
 import '../../../business/data/models/business_model.dart';
 import '../../../product/data/services/product_api_service.dart';
 import '../../../product/data/models/product_stats.dart';
@@ -7,6 +9,8 @@ import '../../../product/presentation/pages/products_page.dart';
 import '../../../customer/data/services/customer_api_service.dart';
 import '../../../customer/data/models/customer_stats.dart';
 import '../../../customer/presentation/pages/customers_page.dart';
+import '../../../invoice/data/services/invoice_provider.dart';
+import '../../../invoice/data/services/invoice_service.dart';
 import '../../../../core/di/service_locator.dart';
 
 class BusinessAnalyticsWidget extends StatefulWidget {
@@ -24,15 +28,19 @@ class BusinessAnalyticsWidget extends StatefulWidget {
 class _BusinessAnalyticsWidgetState extends State<BusinessAnalyticsWidget> {
   late final ProductApiService _productApi;
   late final CustomerApiService _customerApi;
+  late final InvoiceService _invoiceService;
   ProductStats? _productStats;
   CustomerStats? _customerStats;
+  Map<String, dynamic>? _invoiceStats;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _productApi = ProductApiService(ServiceLocator().dio);
-    _customerApi = CustomerApiService(ServiceLocator().dio);
+    final dio = ServiceLocator().dio;
+    _productApi = ProductApiService(dio);
+    _customerApi = CustomerApiService(dio);
+    _invoiceService = InvoiceService(dio);
     if (widget.activeBusiness != null) {
       _loadStats();
     }
@@ -61,6 +69,7 @@ class _BusinessAnalyticsWidgetState extends State<BusinessAnalyticsWidget> {
       final results = await Future.wait([
         _productApi.getProductStats(widget.activeBusiness!.id),
         _customerApi.getCustomerStats(widget.activeBusiness!.id),
+        _invoiceService.getStats(businessId: widget.activeBusiness!.id),
       ]);
       
       print('📊 Stats loaded successfully');
@@ -69,6 +78,7 @@ class _BusinessAnalyticsWidgetState extends State<BusinessAnalyticsWidget> {
         setState(() {
           _productStats = results[0] as ProductStats;
           _customerStats = results[1] as CustomerStats;
+          _invoiceStats = results[2] as Map<String, dynamic>;
           _isLoading = false;
         });
       }
@@ -209,9 +219,21 @@ class _BusinessAnalyticsWidgetState extends State<BusinessAnalyticsWidget> {
                             context,
                             icon: Icons.receipt_long_outlined,
                             title: 'فاکتورها',
-                            value: '89',
-                            subtitle: '+5 امروز',
+                            value: _invoiceStats?['total']?.toString() ?? '0',
+                            subtitle: '+${_invoiceStats?['today'] ?? 0} امروز',
                             color: isDark ? Color(0xFF7AADCE) : theme.colorScheme.secondary,
+                            onTap: widget.activeBusiness != null ? () {
+                              // تنظیم businessId در provider قبل از نمایش صفحه
+                              final invoiceProvider = context.read<InvoiceProvider>();
+                              invoiceProvider.setBusinessId(widget.activeBusiness!.id);
+                              
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const InvoiceListScreen(),
+                                ),
+                              );
+                            } : null,
                           ),
                         ),
                       ],

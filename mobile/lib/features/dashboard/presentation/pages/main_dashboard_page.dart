@@ -44,7 +44,7 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
       _activeBusiness != null
           ? CustomersTabPage(businessId: _activeBusiness!.id)
           : Center(child: Text('لطفاً کسب‌وکار را انتخاب کنید')),
-      const InvoicesTabPage(),
+      InvoicesTabPage(businessId: _activeBusiness?.id),
       const ExpensesTabPage(),
     ];
   }

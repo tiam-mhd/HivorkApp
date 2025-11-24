@@ -26,6 +26,10 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
+  late TextEditingController _addressController;
+  late TextEditingController _cityController;
+  late TextEditingController _provinceController;
+  late TextEditingController _postalCodeController;
   
   CustomerType _type = CustomerType.individual;
   String? _selectedGroupId;
@@ -38,6 +42,10 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
     _nameController = TextEditingController(text: widget.customer?.fullName ?? '');
     _phoneController = TextEditingController(text: widget.customer?.phone ?? '');
     _emailController = TextEditingController(text: widget.customer?.email ?? '');
+    _addressController = TextEditingController(text: widget.customer?.address ?? '');
+    _cityController = TextEditingController(text: widget.customer?.city ?? '');
+    _provinceController = TextEditingController(text: widget.customer?.province ?? '');
+    _postalCodeController = TextEditingController(text: widget.customer?.postalCode ?? '');
     _type = widget.customer?.type ?? CustomerType.individual;
     
     // بررسی اینکه groupId مشتری در لیست گروه‌ها موجود باشه
@@ -62,6 +70,10 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _provinceController.dispose();
+    _postalCodeController.dispose();
     super.dispose();
   }
 
@@ -124,6 +136,64 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
                 ),
                 const SizedBox(height: 16),
                 
+                // Address Section Header
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'اطلاعات آدرس (برای ارسال)',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                
+                // Full Address
+                TextFormField(
+                  controller: _addressController,
+                  decoration: const InputDecoration(
+                    labelText: 'آدرس کامل',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+                
+                // City and Province Row
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _cityController,
+                        decoration: const InputDecoration(
+                          labelText: 'شهر',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _provinceController,
+                        decoration: const InputDecoration(
+                          labelText: 'استان',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                // Postal Code
+                TextFormField(
+                  controller: _postalCodeController,
+                  decoration: const InputDecoration(
+                    labelText: 'کد پستی',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLength: 10,
+                ),
+                const SizedBox(height: 16),
+                
                 // Group Selection
                 DropdownButtonFormField<String>(
                   value: _selectedGroupId,
@@ -174,6 +244,11 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
       'fullName': _nameController.text,
       'phone': _phoneController.text,
       'email': _emailController.text.isEmpty ? null : _emailController.text,
+      'address': _addressController.text.isEmpty ? null : _addressController.text,
+      'city': _cityController.text.isEmpty ? null : _cityController.text,
+      'province': _provinceController.text.isEmpty ? null : _provinceController.text,
+      'postalCode': _postalCodeController.text.isEmpty ? null : _postalCodeController.text,
+      'country': 'ایران',
       'type': _type.toString().split('.').last,
       'groupId': _selectedGroupId,
     };

@@ -3,6 +3,25 @@ import 'attribute_enums.dart';
 
 part 'product_variant.g.dart';
 
+// Attribute label returned by backend
+@JsonSerializable(fieldRename: FieldRename.none)
+class AttributeLabel {
+  final String name;
+  final String value;
+  final String label;
+
+  AttributeLabel({
+    required this.name,
+    required this.value,
+    required this.label,
+  });
+
+  factory AttributeLabel.fromJson(Map<String, dynamic> json) =>
+      _$AttributeLabelFromJson(json);
+  
+  Map<String, dynamic> toJson() => _$AttributeLabelToJson(this);
+}
+
 // Converter for double values that might come as strings from backend
 class DoubleConverter implements JsonConverter<double, dynamic> {
   const DoubleConverter();
@@ -81,6 +100,9 @@ class ProductVariant {
   final String? mainImage;
   final List<String>? images;
   
+  // Attribute labels from backend (computed dynamically)
+  final List<AttributeLabel>? attributeLabels;
+  
   @NullableDoubleConverter()
   final double? weight;
   
@@ -112,6 +134,7 @@ class ProductVariant {
     this.purchasePrice,
     this.mainImage,
     this.images,
+    this.attributeLabels,
     this.weight,
     this.dimensions,
     this.isActive = true,
@@ -144,6 +167,7 @@ class ProductVariant {
     double? purchasePrice,
     String? mainImage,
     List<String>? images,
+    List<AttributeLabel>? attributeLabels,
     double? weight,
     VariantDimensions? dimensions,
     bool? isActive,
@@ -170,6 +194,7 @@ class ProductVariant {
       purchasePrice: purchasePrice ?? this.purchasePrice,
       mainImage: mainImage ?? this.mainImage,
       images: images ?? this.images,
+      attributeLabels: attributeLabels ?? this.attributeLabels,
       weight: weight ?? this.weight,
       dimensions: dimensions ?? this.dimensions,
       isActive: isActive ?? this.isActive,

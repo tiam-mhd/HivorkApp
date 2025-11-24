@@ -63,6 +63,9 @@ class Customer {
   final String? groupColor;
   final String? groupIcon;
   
+  // User link
+  final String? userId;
+  
   // Classification
   final String? category;
   final String? source;
@@ -118,6 +121,7 @@ class Customer {
     this.groupName,
     this.groupColor,
     this.groupIcon,
+    this.userId,
     this.category,
     this.source,
     this.creditLimit = 0,
@@ -229,6 +233,7 @@ class Customer {
     String? groupName,
     String? groupColor,
     String? groupIcon,
+    String? userId,
     String? category,
     String? source,
     double? creditLimit,
@@ -271,6 +276,7 @@ class Customer {
       groupName: groupName ?? this.groupName,
       groupColor: groupColor ?? this.groupColor,
       groupIcon: groupIcon ?? this.groupIcon,
+      userId: userId ?? this.userId,
       category: category ?? this.category,
       source: source ?? this.source,
       creditLimit: creditLimit ?? this.creditLimit,

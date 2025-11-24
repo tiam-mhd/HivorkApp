@@ -48,11 +48,14 @@ dependencies:
   formz: ^0.7.0
   
   # Date & Time
-  persian_datetime_picker: ^2.7.0
   shamsi_date: ^1.1.0
   
   # Charts
   fl_chart: ^0.69.2
+  
+  # PDF Generation
+  pdf: ^3.11.1
+  printing: ^5.13.4
   
   # Navigation
   go_router: ^14.6.2

@@ -44,11 +44,12 @@ class _LoginPasswordPageState extends State<LoginPasswordPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Image.asset(
-          'assets/images/branding/Logo.png',
-          height: 28,
-          fit: BoxFit.contain,
-        ),
+        // title: Image.asset(
+        //   'assets/images/branding/Logo.png',
+        //   height: 28,
+        //   fit: BoxFit.contain,
+        // ),
+        title: Text('ورود به حساب کاربری', style: TextStyle(color: theme.colorScheme.onSurface)),
         centerTitle: true,
         leading: IconButton(
           icon: Container(

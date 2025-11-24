@@ -128,6 +128,7 @@ class VariantApiService {
   // دریافت لیست Variants با فیلتر
   Future<Map<String, dynamic>> getVariants({
     required String productId,
+    // required String businessId,
     VariantStatus? status,
     bool? hasStock,
     int page = 1,
@@ -148,6 +149,8 @@ class VariantApiService {
       if (hasStock != null) {
         queryParams['hasStock'] = hasStock;
       }
+
+      // queryParams['businessId'] = businessId;
 
       final response = await dio.get(
         '/products/$productId/variants',
@@ -220,11 +223,11 @@ class VariantApiService {
   }
 
   // دریافت Variants یک محصول
-  Future<List<ProductVariant>> getProductVariants(String productId) async {
+  Future<List<ProductVariant>> getProductVariants(String productId, String businessId) async {
     try {
       print('🎨 [VARIANT_API] Fetching variants for product: $productId');
       
-      final response = await dio.get('/products/$productId/variants');
+      final response = await dio.get('/products/$productId/variants?businessId=$businessId');
 
       print('✅ [VARIANT_API] Response status: ${response.statusCode}');
 
@@ -265,11 +268,11 @@ class VariantApiService {
   }
 
   // دریافت یک Variant با ID
-  Future<ProductVariant> getVariantById(String productId, String variantId) async {
+  Future<ProductVariant> getVariantById(String productId, String variantId, String businessId) async {
     try {
       print('🎨 [VARIANT_API] Fetching variant: $variantId');
       
-      final response = await dio.get('/products/$productId/variants/$variantId');
+      final response = await dio.get('/products/$productId/variants/$variantId?businessId=$businessId');
 
       print('✅ [VARIANT_API] Response status: ${response.statusCode}');
 

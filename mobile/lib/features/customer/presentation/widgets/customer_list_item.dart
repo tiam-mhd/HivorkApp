@@ -8,6 +8,8 @@ class CustomerListItem extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final bool selectionMode; // برای حالت انتخاب
+  final bool isSelected; // آیا این مشتری انتخاب شده است
 
   const CustomerListItem({
     Key? key,
@@ -15,6 +17,8 @@ class CustomerListItem extends StatelessWidget {
     required this.onTap,
     required this.onEdit,
     required this.onDelete,
+    this.selectionMode = false,
+    this.isSelected = false,
   }) : super(key: key);
 
   @override
@@ -23,8 +27,17 @@ class CustomerListItem extends StatelessWidget {
     final numberFormat = NumberFormat('#,###', 'fa_IR');
 
     return Card(
-      elevation: 1,
+      elevation: isSelected ? 4 : 1,
       margin: EdgeInsets.zero,
+      color: isSelected 
+          ? theme.colorScheme.primaryContainer.withOpacity(0.5)
+          : null,
+      shape: isSelected
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: theme.colorScheme.primary, width: 2),
+            )
+          : null,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
@@ -35,8 +48,12 @@ class CustomerListItem extends StatelessWidget {
               // Avatar
               CircleAvatar(
                 radius: 22,
-                backgroundColor: _getStatusColor().withOpacity(0.15),
-                foregroundColor: _getStatusColor(),
+                backgroundColor: isSelected
+                    ? theme.colorScheme.primary.withOpacity(0.3)
+                    : _getStatusColor().withOpacity(0.15),
+                foregroundColor: isSelected 
+                    ? theme.colorScheme.primary
+                    : _getStatusColor(),
                 child: customer.avatar != null
                     ? ClipOval(
                         child: Image.network(
@@ -138,60 +155,85 @@ class CustomerListItem extends StatelessWidget {
               
               const SizedBox(width: 8),
               
-              // دکمه‌های عملیات
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (customer.phone != null)
+              // دکمه‌های عملیات یا آیکون انتخاب
+              if (selectionMode) ...[
+                // در حالت انتخاب فقط آیکون نشان می‌دهیم
+                if (isSelected)
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.check_rounded,
+                      color: theme.colorScheme.onPrimary,
+                      size: 20,
+                    ),
+                  )
+                else
+                  Icon(
+                    Icons.arrow_back_ios_rounded,
+                    size: 16,
+                    color: theme.colorScheme.onSurface.withOpacity(0.4),
+                  ),
+              ] else ...[
+                // دکمه‌های عملیات در حالت عادی
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (customer.phone != null)
+                      IconButton(
+                        icon: Icon(
+                          Icons.phone_outlined,
+                          size: 20,
+                          color: Colors.green.shade600,
+                        ),
+                        onPressed: () async {
+                          final uri = Uri(scheme: 'tel', path: customer.phone);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri);
+                          }
+                        },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 36,
+                          minHeight: 36,
+                        ),
+                        tooltip: 'تماس',
+                      ),
                     IconButton(
                       icon: Icon(
-                        Icons.phone_outlined,
+                        Icons.edit_outlined,
                         size: 20,
-                        color: Colors.green.shade600,
+                        color: theme.colorScheme.primary,
                       ),
-                      onPressed: () async {
-                        final uri = Uri(scheme: 'tel', path: customer.phone);
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri);
-                        }
-                      },
+                      onPressed: onEdit,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(
                         minWidth: 36,
                         minHeight: 36,
                       ),
-                      tooltip: 'تماس',
+                      tooltip: 'ویرایش',
                     ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.edit_outlined,
-                      size: 20,
-                      color: theme.colorScheme.primary,
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        size: 20,
+                        color: Colors.red,
+                      ),
+                      onPressed: onDelete,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
+                      tooltip: 'حذف',
                     ),
-                    onPressed: onEdit,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
-                    ),
-                    tooltip: 'ویرایش',
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.delete_outline,
-                      size: 20,
-                      color: Colors.red,
-                    ),
-                    onPressed: onDelete,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
-                    ),
-                    tooltip: 'حذف',
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

@@ -37,6 +37,8 @@ import 'features/product/presentation/pages/product_detail_page.dart';
 import 'features/product/presentation/pages/attributes_management_page.dart';
 import 'features/product/presentation/pages/variants_management_page.dart';
 import 'features/product/presentation/pages/stock_report_screen.dart';
+import 'features/invoice/data/services/invoice_provider.dart';
+import 'features/invoice/data/services/invoice_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -363,8 +365,15 @@ class _HivorkAppState extends State<HivorkApp> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _themeNotifier,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: _themeNotifier),
+        ChangeNotifierProvider(
+          create: (_) => InvoiceProvider(
+            InvoiceService(ServiceLocator().dio),
+          ),
+        ),
+      ],
       child: Consumer<ThemeNotifier>(
         builder: (context, themeNotifier, _) {
           return BlocProvider.value(

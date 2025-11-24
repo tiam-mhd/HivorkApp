@@ -335,17 +335,44 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
               final product = state.product;
 
-              // ترکیب همه عکس‌ها
+              // ترکیب همه عکس‌ها (محصول + تنوع‌ها)
               final allImages = <String>[];
+              final imageTypes = <String>[]; // 'product' or 'variant-{variantId}'
+              final variantImageLabels = <List<dynamic>>[]; // برای هر عکس تنوع، لیست لیبل‌ها
+              
+              // عکس‌های محصول
               if (product.mainImage != null) {
                 print('🖼️ [FLUTTER] MainImage: ${product.mainImage}');
                 allImages.add(product.mainImage!);
+                imageTypes.add('product-main');
+                variantImageLabels.add([]);
               }
               if (product.images != null && product.images!.isNotEmpty) {
                 print('🖼️ [FLUTTER] Additional Images: ${product.images}');
                 allImages.addAll(product.images!);
+                for (int i = 0; i < product.images!.length; i++) {
+                  imageTypes.add('product');
+                  variantImageLabels.add([]);
+                }
               }
-              print('🖼️ [FLUTTER] All Images Combined: $allImages');
+              
+              // عکس‌های تنوع‌ها (اگر محصول تنوع داره و variants لود شده)
+              if (product.hasVariants && product.variants != null && product.variants!.isNotEmpty) {
+                print('🖼️ [FLUTTER] Adding variant images from ${product.variants!.length} variants');
+                for (var variant in product.variants!) {
+                  if (variant.mainImage != null && variant.mainImage!.isNotEmpty) {
+                    print('🖼️ [FLUTTER] Variant ${variant.id} MainImage: ${variant.mainImage}');
+                    allImages.add(variant.mainImage!);
+                    imageTypes.add('variant-${variant.id}');
+                    
+                    // اگر attributeLabels داره، اضافه کن
+                    final labels = variant.attributeLabels ?? [];
+                    variantImageLabels.add(labels);
+                  }
+                }
+              }
+              
+              print('🖼️ [FLUTTER] All Images Combined: $allImages (${allImages.length} images)');
               final hasImages = allImages.isNotEmpty;
 
               // Initialize PageController if images exist
@@ -376,38 +403,81 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                               },
                               itemBuilder: (context, index) {
                                 final imageUrl = allImages[index];
-                                print('🖼️ [FLUTTER] Loading image at index $index: $imageUrl');
+                                final imageType = imageTypes[index];
+                                final labels = variantImageLabels[index];
+                                
+                                print('🖼️ [FLUTTER] Loading image at index $index: $imageUrl (type: $imageType)');
+                                
                                 return GestureDetector(
                                   onTap: () => _showImageViewer(context, allImages, index),
-                                  child: Image.network(
-                                    imageUrl,
-                                    fit: BoxFit.cover,
-                                    loadingBuilder: (context, child, loadingProgress) {
-                                      if (loadingProgress == null) {
-                                        print('✅ [FLUTTER] Image loaded successfully: $imageUrl');
-                                        return child;
-                                      }
-                                      print('⏳ [FLUTTER] Loading progress for $imageUrl: ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}');
-                                      return Center(
-                                        child: CircularProgressIndicator(
-                                          value: loadingProgress.expectedTotalBytes != null
-                                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                                              : null,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      // Image
+                                      Image.network(
+                                        imageUrl,
+                                        fit: BoxFit.cover,
+                                        loadingBuilder: (context, child, loadingProgress) {
+                                          if (loadingProgress == null) {
+                                            print('✅ [FLUTTER] Image loaded successfully: $imageUrl');
+                                            return child;
+                                          }
+                                          print('⏳ [FLUTTER] Loading progress for $imageUrl: ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}');
+                                          return Center(
+                                            child: CircularProgressIndicator(
+                                              value: loadingProgress.expectedTotalBytes != null
+                                                  ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                                  : null,
+                                            ),
+                                          );
+                                        },
+                                        errorBuilder: (context, error, stackTrace) {
+                                          print('❌ [FLUTTER] Error loading image $imageUrl: $error');
+                                          print('❌ [FLUTTER] StackTrace: $stackTrace');
+                                          return Container(
+                                            color: theme.colorScheme.surfaceVariant,
+                                            child: Icon(
+                                              Icons.broken_image_outlined,
+                                              size: 80,
+                                              color: theme.colorScheme.onSurface.withOpacity(0.3),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                      
+                                      // Attribute badges for variant images
+                                      if (imageType.startsWith('variant-') && labels.isNotEmpty)
+                                        Positioned(
+                                          bottom: 60,
+                                          left: 16,
+                                          right: 16,
+                                          child: Wrap(
+                                            spacing: 8,
+                                            runSpacing: 8,
+                                            children: labels.map<Widget>((label) {
+                                              return Container(
+                                                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.black.withOpacity(0.7),
+                                                  borderRadius: BorderRadius.circular(20),
+                                                  border: Border.all(
+                                                    color: Colors.white.withOpacity(0.3),
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  '${label['name']}: ${label['label']}',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              );
+                                            }).toList(),
+                                          ),
                                         ),
-                                      );
-                                    },
-                                    errorBuilder: (context, error, stackTrace) {
-                                      print('❌ [FLUTTER] Error loading image $imageUrl: $error');
-                                      print('❌ [FLUTTER] StackTrace: $stackTrace');
-                                      return Container(
-                                        color: theme.colorScheme.surfaceVariant,
-                                        child: Icon(
-                                          Icons.broken_image_outlined,
-                                          size: 80,
-                                          color: theme.colorScheme.onSurface.withOpacity(0.3),
-                                        ),
-                                      );
-                                    },
+                                    ],
                                   ),
                                 );
                               },
@@ -424,6 +494,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                                     begin: Alignment.topCenter,
                                     end: Alignment.bottomCenter,
                                     colors: [
+                                      Colors.black.withOpacity(0.8),
                                       Colors.black.withOpacity(0.5),
                                       Colors.black.withOpacity(0.2),
                                       Colors.transparent,
@@ -552,8 +623,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                           onPressed: () => _showDeleteDialog(product),
                         ),
                       ],
-                      // Badge for main image - below the actions
-                      bottom: (_currentImageIndex == 0 && product.mainImage != null)
+                      // Badge for main image - only show for product main image
+                      bottom: (_currentImageIndex < imageTypes.length && imageTypes[_currentImageIndex] == 'product-main')
                           ? PreferredSize(
                               preferredSize: Size.fromHeight(40),
                               child: Container(
@@ -1409,41 +1480,101 @@ class _ImageViewerPageState extends State<_ImageViewerPage> {
           style: TextStyle(color: Colors.white),
         ),
       ),
-      body: PageView.builder(
-        controller: _pageController,
-        itemCount: widget.images.length,
-        onPageChanged: (index) {
-          setState(() => _currentIndex = index);
-        },
-        itemBuilder: (context, index) {
-          return InteractiveViewer(
-            child: Center(
-              child: Image.network(
-                widget.images[index],
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.broken_image_outlined,
-                          size: 64,
-                          color: Colors.white54,
+      body: Stack(
+        children: [
+          // Image PageView
+          PageView.builder(
+            controller: _pageController,
+            itemCount: widget.images.length,
+            onPageChanged: (index) {
+              setState(() => _currentIndex = index);
+            },
+            itemBuilder: (context, index) {
+              return InteractiveViewer(
+                child: Center(
+                  child: Image.network(
+                    widget.images[index],
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.broken_image_outlined,
+                              size: 64,
+                              color: Colors.white54,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'خطا در بارگذاری تصویر',
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          ],
                         ),
-                        SizedBox(height: 16),
-                        Text(
-                          'خطا در بارگذاری تصویر',
-                          style: TextStyle(color: Colors.white54),
-                        ),
-                      ],
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+          
+          // Navigation buttons (only show if more than 1 image)
+          if (widget.images.length > 1) ...[
+            // Previous button
+            if (_currentIndex > 0)
+              Positioned(
+                left: 16,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
                     ),
-                  );
-                },
+                    child: IconButton(
+                      icon: Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                      iconSize: 32,
+                      onPressed: () {
+                        _pageController.previousPage(
+                          duration: Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ),
-            ),
-          );
-        },
+            
+            // Next button
+            if (_currentIndex < widget.images.length - 1)
+              Positioned(
+                right: 16,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: Icon(Icons.arrow_forward_ios, color: Colors.white),
+                      iconSize: 32,
+                      onPressed: () {
+                        _pageController.nextPage(
+                          duration: Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ],
       ),
     );
   }

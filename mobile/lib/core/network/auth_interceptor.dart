@@ -17,7 +17,10 @@ class AuthInterceptor extends Interceptor {
     if (accessToken != null && accessToken.isNotEmpty) {
       // Add Authorization header
       options.headers['Authorization'] = 'Bearer $accessToken';
+      print('🔐 [AUTH] Token added to ${options.method} ${options.path}');
+      print('🔐 [AUTH] Token: ${accessToken.substring(0, 20)}...');
     } else {
+      print('⚠️ [AUTH] No token found for ${options.method} ${options.path}');
     }
 
     return handler.next(options);

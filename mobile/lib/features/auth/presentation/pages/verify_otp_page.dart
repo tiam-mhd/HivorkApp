@@ -111,11 +111,12 @@ class _VerifyOtpPageState extends State<VerifyOtpPage>
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Image.asset(
-          'assets/images/branding/Logo.png',
-          height: 28,
-          fit: BoxFit.contain,
-        ),
+        // title: Image.asset(
+        //   'assets/images/branding/Logo.png',
+        //   height: 28,
+        //   fit: BoxFit.contain,
+        // ),
+        title: Text('تایید شماره تلفن', style: TextStyle(color: theme.colorScheme.onSurface)),
         centerTitle: true,
         leading: IconButton(
           icon: Container(
@@ -197,7 +198,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage>
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(height: 20),
 
@@ -210,13 +211,13 @@ class _VerifyOtpPageState extends State<VerifyOtpPage>
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primary,
                       borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: theme.colorScheme.primary.withOpacity(0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
+                      // boxShadow: [
+                      //   BoxShadow(
+                      //     color: theme.colorScheme.primary.withOpacity(0.3),
+                      //     blurRadius: 20,
+                      //     offset: const Offset(0, 10),
+                      //   ),
+                      // ],
                     ),
                     child: Icon(
                       Icons.message_rounded,

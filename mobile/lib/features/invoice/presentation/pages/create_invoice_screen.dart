@@ -18,11 +18,7 @@ class CreateInvoiceScreen extends StatefulWidget {
   final Invoice? invoice;
   final String? businessId;
 
-  const CreateInvoiceScreen({
-    super.key,
-    this.invoice,
-    this.businessId,
-  });
+  const CreateInvoiceScreen({super.key, this.invoice, this.businessId});
 
   @override
   _CreateInvoiceScreenState createState() => _CreateInvoiceScreenState();
@@ -31,27 +27,27 @@ class CreateInvoiceScreen extends StatefulWidget {
 class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
   final _formKey = GlobalKey<FormState>();
   final _notesController = TextEditingController();
-  
+
   InvoiceType? _selectedType;
   DateTime _selectedDate = DateTime.now();
   Customer? _selectedCustomer;
   List<InvoiceItemData> _items = [];
-  
+
   // Toggles for optional fields
   bool _hasDiscount = false;
   bool _hasTax = false;
   bool _hasExtraCosts = false;
-  
+
   // Discount fields
   DiscountType _discountType = DiscountType.percentage;
   final _discountValueController = TextEditingController();
-  
+
   // Tax fields
   final _taxPercentageController = TextEditingController(text: '9');
-  
+
   // Extra costs
   List<ExtraCostData> _extraCosts = [];
-  
+
   // Calculated values
   double _subtotal = 0;
   double _discountAmount = 0;
@@ -86,51 +82,62 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
     // Load customer - note: Invoice model doesn't have full customer object, only customerId/customerName
     // We'll need to fetch customer separately if needed for edit mode
     _notesController.text = invoice.notes ?? '';
-    
+
     // Load items
-    _items = invoice.items.map((item) => InvoiceItemData(
-      productId: item.productId ?? '',
-      productName: item.productName,
-      variantId: item.variantId,
-      variantName: item.description, // Using description as variantName
-      quantity: item.quantity.toInt(),
-      unitPrice: item.unitPrice,
-    )).toList();
-    
+    _items = invoice.items
+        .map(
+          (item) => InvoiceItemData(
+            productId: item.productId ?? '',
+            productName: item.productName,
+            variantId: item.variantId,
+            variantName: item.description, // Using description as variantName
+            quantity: item.quantity.toInt(),
+            unitPrice: item.unitPrice,
+          ),
+        )
+        .toList();
+
     // Load discount
     if (invoice.discountAmount > 0) {
       _hasDiscount = true;
       _discountType = invoice.discountType ?? DiscountType.percentage;
       _discountValueController.text = (invoice.discountValue ?? 0).toString();
     }
-    
+
     // Load tax
     if (invoice.taxAmount > 0) {
       _hasTax = true;
-      final taxRate = (invoice.taxAmount / invoice.subtotal * 100).toStringAsFixed(0);
+      final taxRate = (invoice.taxAmount / invoice.subtotal * 100)
+          .toStringAsFixed(0);
       _taxPercentageController.text = taxRate;
     }
-    
+
     // Load extra costs
     if (invoice.extraCosts.isNotEmpty) {
       _hasExtraCosts = true;
-      _extraCosts = invoice.extraCosts.map((cost) => ExtraCostData(
-        description: cost.title,
-        amount: cost.amount,
-      )).toList();
+      _extraCosts = invoice.extraCosts
+          .map(
+            (cost) =>
+                ExtraCostData(description: cost.title, amount: cost.amount),
+          )
+          .toList();
     }
-    
+
     _recalculateTotals();
   }
 
   void _recalculateTotals() {
     setState(() {
       // Calculate subtotal
-      _subtotal = _items.fold(0, (sum, item) => sum + (item.quantity * item.unitPrice));
-      
+      _subtotal = _items.fold(
+        0,
+        (sum, item) => sum + (item.quantity * item.unitPrice),
+      );
+
       // Calculate discount
       if (_hasDiscount) {
-        final discountValue = double.tryParse(_discountValueController.text) ?? 0;
+        final discountValue =
+            double.tryParse(_discountValueController.text) ?? 0;
         if (_discountType == DiscountType.percentage) {
           _discountAmount = _subtotal * (discountValue / 100);
         } else {
@@ -139,23 +146,27 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
       } else {
         _discountAmount = 0;
       }
-      
+
       // Calculate tax
       if (_hasTax) {
-        final taxPercentage = double.tryParse(_taxPercentageController.text) ?? 0;
+        final taxPercentage =
+            double.tryParse(_taxPercentageController.text) ?? 0;
         final taxableAmount = _subtotal - _discountAmount;
         _taxAmount = taxableAmount * (taxPercentage / 100);
       } else {
         _taxAmount = 0;
       }
-      
+
       // Calculate extra costs total
       if (_hasExtraCosts) {
-        _extraCostsTotal = _extraCosts.fold(0, (sum, cost) => sum + cost.amount);
+        _extraCostsTotal = _extraCosts.fold(
+          0,
+          (sum, cost) => sum + cost.amount,
+        );
       } else {
         _extraCostsTotal = 0;
       }
-      
+
       // Calculate total
       _total = _subtotal - _discountAmount + _taxAmount + _extraCostsTotal;
     });
@@ -197,11 +208,11 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
                       const SizedBox(height: 16),
                       _buildItemsSection(theme),
                       const SizedBox(height: 16),
-                      _buildDiscountSection(theme),
-                      const SizedBox(height: 16),
-                      _buildTaxSection(theme),
-                      const SizedBox(height: 16),
-                      _buildExtraCostsSection(theme),
+                      _buildDiscountTaxExtraCostsSection(theme),
+                      // const SizedBox(height: 16),
+                      // _buildTaxSection(theme),
+                      // const SizedBox(height: 16),
+                      // _buildExtraCostsSection(theme),
                       const SizedBox(height: 16),
                       _buildNotesSection(theme),
                       const SizedBox(height: 16),
@@ -221,15 +232,13 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
 
   Widget _buildSelectTypePrompt(ThemeData theme) {
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return Card(
       elevation: 0,
       color: theme.cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: theme.colorScheme.outline.withOpacity(0.2),
-        ),
+        side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.2)),
       ),
       child: InkWell(
         onTap: _selectType,
@@ -275,9 +284,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.2),
-        ),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
       ),
       child: Row(
         children: [
@@ -366,7 +373,11 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
           children: [
             Row(
               children: [
-                Icon(icon, size: 16, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+                Icon(
+                  icon,
+                  size: 16,
+                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                ),
                 const SizedBox(width: 4),
                 Text(
                   label,
@@ -376,7 +387,11 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
                 ),
                 if (onTap != null) ...[
                   const Spacer(),
-                  Icon(Icons.edit_rounded, size: 14, color: theme.colorScheme.primary),
+                  Icon(
+                    Icons.edit_rounded,
+                    size: 14,
+                    color: theme.colorScheme.primary,
+                  ),
                 ],
               ],
             ),
@@ -429,7 +444,9 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
                 child: Row(
                   children: [
                     CircleAvatar(
-                      backgroundColor: theme.colorScheme.primary.withOpacity(0.2),
+                      backgroundColor: theme.colorScheme.primary.withOpacity(
+                        0.2,
+                      ),
                       child: Icon(
                         Icons.person_rounded,
                         color: theme.colorScheme.primary,
@@ -450,7 +467,9 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
                             Text(
                               _selectedCustomer!.phone!,
                               style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                                color: theme.colorScheme.onSurface.withOpacity(
+                                  0.6,
+                                ),
                               ),
                             ),
                         ],
@@ -509,8 +528,9 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _items.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                itemBuilder: (context, index) => _buildItemRow(_items[index], index, theme),
+                separatorBuilder: (context, index) => const SizedBox(height: 2),
+                itemBuilder: (context, index) =>
+                    _buildItemRow(_items[index], index, theme),
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
@@ -530,7 +550,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
 
   Widget _buildItemRow(InvoiceItemData item, int index, ThemeData theme) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
         borderRadius: BorderRadius.circular(8),
@@ -543,36 +563,37 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      item.productName,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (item.variantName?.isNotEmpty ?? false)
+                    if (item.variantName?.isNotEmpty ?? false) ...[
                       Text(
                         item.variantName!,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          fontWeight: FontWeight.w600,
+                          // color: theme.colorScheme.onSurface.withOpacity(0.6),
                         ),
                       ),
+                    ] else ...[
+                      Text(
+                        item.productName,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              IconButton(
-                onPressed: () => _removeItem(index),
-                icon: const Icon(Icons.delete_outline_rounded),
-                color: Colors.red,
-                iconSize: 20,
-              ),
+              // IconButton(
+              //   onPressed: () => _removeItem(index),
+              //   icon: const Icon(Icons.delete_outline_rounded),
+              //   color: Colors.red,
+              //   iconSize: 20,
+              // ),
             ],
           ),
-          const SizedBox(height: 8),
+          // const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(
-                child: _buildQuantityControl(item, theme),
-              ),
+              Expanded(child: _buildQuantityControl(item, theme)),
               const SizedBox(width: 12),
               Text(
                 NumberFormatter.formatCurrency(item.unitPrice),
@@ -590,12 +611,14 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
               ),
             ],
           ),
+          Divider()
         ],
       ),
     );
   }
 
   Widget _buildQuantityControl(InvoiceItemData item, ThemeData theme) {
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -608,10 +631,11 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
               });
             }
           },
-          icon: const Icon(Icons.remove_rounded),
+          icon: Icon((item.quantity > 1) ? Icons.remove_rounded : Icons.delete_outline_rounded,
+                color: (item.quantity > 1) ?theme.colorScheme.onSurface  : Colors.red),
           style: IconButton.styleFrom(
             backgroundColor: theme.colorScheme.surfaceVariant,
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(2),
             minimumSize: const Size(32, 32),
           ),
         ),
@@ -635,11 +659,280 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
           icon: const Icon(Icons.add_rounded),
           style: IconButton.styleFrom(
             backgroundColor: theme.colorScheme.surfaceVariant,
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(2),
             minimumSize: const Size(32, 32),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDiscountTaxExtraCostsSection(ThemeData theme) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.discount_rounded,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'تخفیف',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                Switch(
+                  value: _hasDiscount,
+                  onChanged: (value) {
+                    setState(() {
+                      _hasDiscount = value;
+                      if (!value) _discountValueController.clear();
+                      _recalculateTotals();
+                    });
+                  },
+                ),
+              ],
+            ),
+            if (_hasDiscount) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: SegmentedButton<DiscountType>(
+                      segments: const [
+                        ButtonSegment(
+                          value: DiscountType.percentage,
+                          label: Text('درصد'),
+                          icon: Icon(Icons.percent_rounded, size: 16),
+                        ),
+                        ButtonSegment(
+                          value: DiscountType.amount,
+                          label: Text('مبلغ'),
+                          icon: Icon(Icons.money_rounded, size: 16),
+                        ),
+                      ],
+                      selected: {_discountType},
+                      onSelectionChanged: (Set<DiscountType> newSelection) {
+                        setState(() {
+                          _discountType = newSelection.first;
+                          _recalculateTotals();
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _discountValueController,
+                decoration: InputDecoration(
+                  labelText: _discountType == DiscountType.percentage
+                      ? 'درصد تخفیف'
+                      : 'مبلغ تخفیف',
+                  suffixText: _discountType == DiscountType.percentage
+                      ? '%'
+                      : 'تومان',
+                  border: const OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                ],
+              ),
+              if (_discountAmount > 0) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'معادل: ${NumberFormatter.formatCurrency(_discountAmount)}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 20),
+            ],
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.receipt_long_rounded,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'مالیات',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                Switch(
+                  value: _hasTax,
+                  onChanged: (value) {
+                    setState(() {
+                      _hasTax = value;
+                      if (!value) _taxPercentageController.text = '9';
+                      _recalculateTotals();
+                    });
+                  },
+                ),
+              ],
+            ),
+            if (_hasTax) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _taxPercentageController,
+                decoration: const InputDecoration(
+                  labelText: 'درصد مالیات',
+                  suffixText: '%',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                ],
+              ),
+              if (_taxAmount > 0) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'مبلغ مالیات: ${NumberFormatter.formatCurrency(_taxAmount)}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+            ],
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.add_circle_outline_rounded,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'هزینه‌های اضافی',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                Switch(
+                  value: _hasExtraCosts,
+                  onChanged: (value) {
+                    setState(() {
+                      _hasExtraCosts = value;
+                      if (!value) _extraCosts.clear();
+                      _recalculateTotals();
+                    });
+                  },
+                ),
+              ],
+            ),
+            if (_hasExtraCosts) ...[
+              const SizedBox(height: 16),
+              if (_extraCosts.isEmpty)
+                OutlinedButton.icon(
+                  onPressed: _addExtraCost,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('افزودن هزینه'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(40),
+                  ),
+                )
+              else ...[
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _extraCosts.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final cost = _extraCosts[index];
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceVariant.withOpacity(
+                          0.3,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  cost.description,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  NumberFormatter.formatCurrency(cost.amount),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => _removeExtraCost(index),
+                            icon: const Icon(Icons.delete_outline_rounded),
+                            color: Colors.red,
+                            iconSize: 20,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _addExtraCost,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('افزودن هزینه بیشتر'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(40),
+                  ),
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -714,11 +1007,17 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
               TextFormField(
                 controller: _discountValueController,
                 decoration: InputDecoration(
-                  labelText: _discountType == DiscountType.percentage ? 'درصد تخفیف' : 'مبلغ تخفیف',
-                  suffixText: _discountType == DiscountType.percentage ? '%' : 'تومان',
+                  labelText: _discountType == DiscountType.percentage
+                      ? 'درصد تخفیف'
+                      : 'مبلغ تخفیف',
+                  suffixText: _discountType == DiscountType.percentage
+                      ? '%'
+                      : 'تومان',
                   border: const OutlineInputBorder(),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                 ],
@@ -733,137 +1032,6 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
                   ),
                 ),
               ],
-
-
-              Row(
-                  children: [
-                    Icon(
-                      Icons.receipt_long_rounded,
-                      size: 20,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'مالیات',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                Switch(
-                  value: _hasTax,
-                  onChanged: (value) {
-                    setState(() {
-                      _hasTax = value;
-                      if (!value) _taxPercentageController.text = '9';
-                      _recalculateTotals();
-                    });
-                  },
-                ),
-              
-
-              Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.add_circle_outline_rounded,
-                      size: 20,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'هزینه‌های اضافی',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                Switch(
-                  value: _hasExtraCosts,
-                  onChanged: (value) {
-                    setState(() {
-                      _hasExtraCosts = value;
-                      if (!value) _extraCosts.clear();
-                      _recalculateTotals();
-                    });
-                  },
-                ),
-              ],
-            ),
-            if (_hasExtraCosts) ...[
-              const SizedBox(height: 16),
-              if (_extraCosts.isEmpty)
-                OutlinedButton.icon(
-                  onPressed: _addExtraCost,
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('افزودن هزینه'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(40),
-                  ),
-                )
-              else ...[
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _extraCosts.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final cost = _extraCosts[index];
-                    return Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  cost.description,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  NumberFormatter.formatCurrency(cost.amount),
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => _removeExtraCost(index),
-                            icon: const Icon(Icons.delete_outline_rounded),
-                            color: Colors.red,
-                            iconSize: 20,
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _addExtraCost,
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('افزودن هزینه بیشتر'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(40),
-                  ),
-                ),
-              ],
-            ],
-          
             ],
           ],
         ),
@@ -918,7 +1086,9 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
                   suffixText: '%',
                   border: OutlineInputBorder(),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                 ],
@@ -994,13 +1164,16 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: _extraCosts.length,
-                  separatorBuilder: (context, index) => const SizedBox(height: 8),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final cost = _extraCosts[index];
                     return Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                        color: theme.colorScheme.surfaceVariant.withOpacity(
+                          0.3,
+                        ),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
@@ -1097,9 +1270,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
       decoration: BoxDecoration(
         color: theme.colorScheme.primaryContainer.withOpacity(0.15),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: theme.colorScheme.primary.withOpacity(0.2),
-        ),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
       ),
       child: Column(
         children: [
@@ -1125,7 +1296,10 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
     );
   }
 
-  Widget _buildTotalRow(String label, double amount, ThemeData theme, {
+  Widget _buildTotalRow(
+    String label,
+    double amount,
+    ThemeData theme, {
     bool isFinal = false,
     bool isDiscount = false,
   }) {
@@ -1147,8 +1321,8 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
             color: isFinal
                 ? theme.colorScheme.primary
                 : isDiscount
-                    ? Colors.red
-                    : null,
+                ? Colors.red
+                : null,
           ),
         ),
       ],
@@ -1173,7 +1347,9 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: provider.isLoading ? null : () => Navigator.pop(context),
+                onPressed: provider.isLoading
+                    ? null
+                    : () => Navigator.pop(context),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
                 ),
@@ -1217,10 +1393,10 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
       context: context,
       initialDate: _selectedDate,
       firstDate: DateTime(2021, 3, 21), // 1400/1/1
-      lastDate: DateTime(2032, 3, 20),  // 1410/12/29
+      lastDate: DateTime(2032, 3, 20), // 1410/12/29
       locale: const Locale('fa', 'IR'),
     );
-    
+
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
@@ -1240,7 +1416,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
         ),
       ),
     );
-    
+
     if (result != null && mounted) {
       setState(() {
         _selectedCustomer = result;
@@ -1251,7 +1427,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
   Future<void> _selectProducts() async {
     final provider = context.read<InvoiceProvider>();
     final businessId = provider.businessId;
-    
+
     if (businessId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('لطفاً ابتدا کسب‌وکار را انتخاب کنید')),
@@ -1262,9 +1438,8 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
     final result = await Navigator.push<List<Map<String, dynamic>>>(
       context,
       MaterialPageRoute(
-        builder: (context) => ProductVariantSelectionScreen(
-          businessId: businessId,
-        ),
+        builder: (context) =>
+            ProductVariantSelectionScreen(businessId: businessId),
       ),
     );
 
@@ -1283,14 +1458,16 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
           }
 
           // اضافه کردن به لیست items
-          _items.add(InvoiceItemData(
-            productId: product.id,
-            productName: product.name,
-            variantId: variant?.id,
-            variantName: variant?.name ?? variant?.sku,
-            quantity: 1,
-            unitPrice: price,
-          ));
+          _items.add(
+            InvoiceItemData(
+              productId: product.id,
+              productName: product.name,
+              variantId: variant?.id,
+              variantName: variant?.name ?? variant?.sku,
+              quantity: 1,
+              unitPrice: price,
+            ),
+          );
         }
         _recalculateTotals();
       });
@@ -1298,10 +1475,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${result.length} محصول اضافه شد'),
-          action: SnackBarAction(
-            label: 'باشه',
-            onPressed: () {},
-          ),
+          action: SnackBarAction(label: 'باشه', onPressed: () {}),
         ),
       );
     }
@@ -1319,7 +1493,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
       context: context,
       builder: (context) => const _ExtraCostDialog(),
     );
-    
+
     if (result != null) {
       setState(() {
         _extraCosts.add(result);
@@ -1337,14 +1511,14 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
 
   Future<void> _saveInvoice() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     if (_selectedCustomer == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('لطفاً مشتری را انتخاب کنید')),
       );
       return;
     }
-    
+
     if (_items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('لطفاً حداقل یک محصول اضافه کنید')),
@@ -1353,18 +1527,23 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
     }
 
     final provider = context.read<InvoiceProvider>();
-    
+
     final invoiceData = {
       'type': _selectedType!.name,
-      'issueDate': _selectedDate.toIso8601String(), // تغییر از invoiceDate به issueDate
+      'issueDate': _selectedDate
+          .toIso8601String(), // تغییر از invoiceDate به issueDate
       'customerId': _selectedCustomer!.id,
-      'items': _items.map((item) => {
-        'productId': item.productId,
-        'variantId': item.variantId,
-        'productName': item.productName, // اضافه کردن productName
-        'quantity': item.quantity,
-        'unitPrice': item.unitPrice,
-      }).toList(),
+      'items': _items
+          .map(
+            (item) => {
+              'productId': item.productId,
+              'variantId': item.variantId,
+              'productName': item.productName, // اضافه کردن productName
+              'quantity': item.quantity,
+              'unitPrice': item.unitPrice,
+            },
+          )
+          .toList(),
       if (_hasDiscount && _discountValueController.text.isNotEmpty) ...{
         'discountType': _discountType.name,
         'discountValue': double.parse(_discountValueController.text),
@@ -1372,12 +1551,15 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
       if (_hasTax && _taxPercentageController.text.isNotEmpty)
         'taxPercentage': double.parse(_taxPercentageController.text),
       if (_hasExtraCosts && _extraCosts.isNotEmpty)
-        'extraCosts': _extraCosts.map((cost) => {
-          'description': cost.description,
-          'amount': cost.amount,
-        }).toList(),
-      if (_notesController.text.isNotEmpty)
-        'notes': _notesController.text,
+        'extraCosts': _extraCosts
+            .map(
+              (cost) => {
+                'description': cost.description,
+                'amount': cost.amount,
+              },
+            )
+            .toList(),
+      if (_notesController.text.isNotEmpty) 'notes': _notesController.text,
     };
 
     if (_isEditMode) {
@@ -1389,7 +1571,13 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
     if (mounted && provider.error == null) {
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_isEditMode ? 'فاکتور با موفقیت به‌روزرسانی شد' : 'فاکتور با موفقیت ایجاد شد')),
+        SnackBar(
+          content: Text(
+            _isEditMode
+                ? 'فاکتور با موفقیت به‌روزرسانی شد'
+                : 'فاکتور با موفقیت ایجاد شد',
+          ),
+        ),
       );
     }
   }
@@ -1418,10 +1606,7 @@ class ExtraCostData {
   final String description;
   final double amount;
 
-  ExtraCostData({
-    required this.description,
-    required this.amount,
-  });
+  ExtraCostData({required this.description, required this.amount});
 }
 
 // Extra Cost Dialog
@@ -1474,7 +1659,9 @@ class _ExtraCostDialogState extends State<_ExtraCostDialog> {
                 suffixText: 'تومان',
                 border: OutlineInputBorder(),
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
               ],

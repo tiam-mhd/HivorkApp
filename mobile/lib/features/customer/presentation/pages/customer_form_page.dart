@@ -9,11 +9,14 @@ class CustomerFormPage extends StatefulWidget {
   final Customer? customer;
   final List<CustomerGroup>? groups;
 
+  final bool isSelectionMode;
+
   const CustomerFormPage({
     Key? key,
     required this.businessId,
     this.customer,
     this.groups,
+    this.isSelectionMode = false
   }) : super(key: key);
 
   @override
@@ -86,7 +89,12 @@ class _CustomerFormPageState extends State<CustomerFormPage> {
       body: BlocListener<CustomerBloc, CustomerState>(
         listener: (context, state) {
           if (state is CustomerOperationSuccess) {
-            Navigator.pop(context, true);
+            if (widget.isSelectionMode && state.customer != null) {
+              // اگر حالت انتخاب است و مشتری جدید ایجاد شده را داریم، همان را برگردان
+              Navigator.pop(context, state.customer);
+            } else {
+              Navigator.pop(context, true);
+            }
           } else if (state is CustomerError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message), backgroundColor: Colors.red),

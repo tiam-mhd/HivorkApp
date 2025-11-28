@@ -36,9 +36,9 @@ class _CustomersPageState extends State<CustomersPage> {
   late CustomerBloc _customerBloc;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
+
   CustomerFilter? _currentFilter;
-  
+
   // Groups
   List<CustomerGroup> _groups = [];
   bool _loadingGroups = false;
@@ -49,18 +49,15 @@ class _CustomersPageState extends State<CustomersPage> {
     super.initState();
     _currentFilter = widget.initialFilter;
     final dio = ServiceLocator().dio;
-    _customerBloc = CustomerBloc(
-      CustomerRepository(CustomerApiService(dio)),
+    _customerBloc = CustomerBloc(CustomerRepository(CustomerApiService(dio)));
+    _customerBloc.add(
+      LoadCustomers(businessId: widget.businessId, filter: _currentFilter),
     );
-    _customerBloc.add(LoadCustomers(
-      businessId: widget.businessId,
-      filter: _currentFilter,
-    ));
 
     _scrollController.addListener(_onScroll);
     _loadGroups();
   }
-  
+
   Future<void> _loadGroups() async {
     setState(() => _loadingGroups = true);
     try {
@@ -76,22 +73,30 @@ class _CustomersPageState extends State<CustomersPage> {
       setState(() => _loadingGroups = false);
     }
   }
-  
+
   void _onGroupSelected(String? groupId) {
     setState(() {
       _selectedGroupId = groupId;
       if (groupId == null || groupId == 'all') {
         // همه مشتریان
-        _currentFilter = _currentFilter?.copyWith(groupId: 'all') ?? CustomerFilter(groupId: 'all');
+        _currentFilter =
+            _currentFilter?.copyWith(groupId: 'all') ??
+            CustomerFilter(groupId: 'all');
       } else if (groupId == 'null') {
         // عمومی (بدون گروه)
-        _currentFilter = (_currentFilter ?? CustomerFilter()).copyWith(groupId: 'null');
+        _currentFilter = (_currentFilter ?? CustomerFilter()).copyWith(
+          groupId: 'null',
+        );
       } else {
         // گروه خاص
-        _currentFilter = (_currentFilter ?? CustomerFilter()).copyWith(groupId: groupId);
+        _currentFilter = (_currentFilter ?? CustomerFilter()).copyWith(
+          groupId: groupId,
+        );
       }
     });
-    _customerBloc.add(LoadCustomers(businessId: widget.businessId, filter: _currentFilter));
+    _customerBloc.add(
+      LoadCustomers(businessId: widget.businessId, filter: _currentFilter),
+    );
   }
 
   void _onScroll() {
@@ -116,7 +121,7 @@ class _CustomersPageState extends State<CustomersPage> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.selectionMode ? 'انتخاب مشتری' : 'مشتریان'),
-          actions: widget.selectionMode 
+          actions: widget.selectionMode
               ? [
                   // در حالت انتخاب فقط دکمه افزودن مشتری جدید
                   IconButton(
@@ -126,16 +131,26 @@ class _CustomersPageState extends State<CustomersPage> {
                       final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => CustomerFormPage(
-                            businessId: widget.businessId,
+                          builder: (context) => BlocProvider.value(
+                            value: _customerBloc,
+                            child: CustomerFormPage(
+                              businessId: widget.businessId,
+                              groups: _groups,
+                              isSelectionMode: widget.selectionMode,
+                            ),
                           ),
                         ),
                       );
-                      if (result == true) {
-                        _customerBloc.add(LoadCustomers(
-                          businessId: widget.businessId,
-                          filter: _currentFilter,
-                        ));
+                      // اگر در حالت انتخاب هستیم و نتیجه یک مشتری جدید بود، همان مشتری را انتخاب و بازگردان
+                      if (widget.selectionMode && result is Customer) {
+                        Navigator.pop(context, result);
+                      } else if (result == true) {
+                        _customerBloc.add(
+                          LoadCustomers(
+                            businessId: widget.businessId,
+                            filter: _currentFilter,
+                          ),
+                        );
                       }
                     },
                   ),
@@ -155,10 +170,12 @@ class _CustomersPageState extends State<CustomersPage> {
                         ),
                       );
                       _loadGroups();
-                      _customerBloc.add(LoadCustomers(
-                        businessId: widget.businessId,
-                        filter: _currentFilter,
-                      ));
+                      _customerBloc.add(
+                        LoadCustomers(
+                          businessId: widget.businessId,
+                          filter: _currentFilter,
+                        ),
+                      );
                     },
                   ),
                   // جستجو
@@ -180,7 +197,10 @@ class _CustomersPageState extends State<CustomersPage> {
               SizedBox(
                 height: 60,
                 child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   scrollDirection: Axis.horizontal,
                   children: [
                     // همه
@@ -188,7 +208,9 @@ class _CustomersPageState extends State<CustomersPage> {
                       padding: const EdgeInsets.only(left: 8),
                       child: FilterChip(
                         label: const Text('همه'),
-                        selected: _selectedGroupId == null || _selectedGroupId == 'all',
+                        selected:
+                            _selectedGroupId == null ||
+                            _selectedGroupId == 'all',
                         onSelected: (_) => _onGroupSelected('all'),
                       ),
                     ),
@@ -221,7 +243,8 @@ class _CustomersPageState extends State<CustomersPage> {
                                   ),
                                 ),
                               Text(group.name),
-                              if (group.customerCount != null && group.customerCount! > 0)
+                              if (group.customerCount != null &&
+                                  group.customerCount! > 0)
                                 Padding(
                                   padding: const EdgeInsets.only(right: 4),
                                   child: Text(
@@ -239,19 +262,21 @@ class _CustomersPageState extends State<CustomersPage> {
                   ],
                 ),
               ),
-            
+
             // Customer list
             Expanded(
               child: BlocConsumer<CustomerBloc, CustomerState>(
                 listener: (context, state) {
                   if (state is CustomerOperationSuccess) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(state.message)),
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(state.message)));
+                    _customerBloc.add(
+                      LoadCustomers(
+                        businessId: widget.businessId,
+                        filter: _currentFilter,
+                      ),
                     );
-                    _customerBloc.add(LoadCustomers(
-                      businessId: widget.businessId,
-                      filter: _currentFilter,
-                    ));
                   } else if (state is CustomerError) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -272,11 +297,18 @@ class _CustomersPageState extends State<CustomersPage> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+                            Icon(
+                              Icons.people_outline,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
                             const SizedBox(height: 16),
                             Text(
                               'مشتری یافت نشد',
-                              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
+                              ),
                             ),
                             const SizedBox(height: 8),
                             Text(
@@ -296,7 +328,8 @@ class _CustomersPageState extends State<CustomersPage> {
                       child: ListView.separated(
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16),
-                        itemCount: state.customers.length + (state.hasMore ? 1 : 0),
+                        itemCount:
+                            state.customers.length + (state.hasMore ? 1 : 0),
                         separatorBuilder: (_, __) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           if (index >= state.customers.length) {
@@ -312,7 +345,8 @@ class _CustomersPageState extends State<CustomersPage> {
                           return CustomerListItem(
                             customer: customer,
                             selectionMode: widget.selectionMode,
-                            isSelected: widget.selectedCustomer?.id == customer.id,
+                            isSelected:
+                                widget.selectedCustomer?.id == customer.id,
                             onTap: () {
                               if (widget.selectionMode) {
                                 // در حالت انتخاب، مشتری را برگردان
@@ -336,7 +370,7 @@ class _CustomersPageState extends State<CustomersPage> {
             ),
           ],
         ),
-        floatingActionButton: widget.selectionMode 
+        floatingActionButton: widget.selectionMode
             ? null
             : FloatingActionButton(
                 onPressed: _navigateToCreate,
@@ -398,10 +432,9 @@ class _CustomersPageState extends State<CustomersPage> {
         search: query.isEmpty ? null : query,
       );
     });
-    _customerBloc.add(LoadCustomers(
-      businessId: widget.businessId,
-      filter: _currentFilter,
-    ));
+    _customerBloc.add(
+      LoadCustomers(businessId: widget.businessId, filter: _currentFilter),
+    );
   }
 
   void _showFilterDialog() {
@@ -412,10 +445,12 @@ class _CustomersPageState extends State<CustomersPage> {
         groups: _groups,
         onApply: (filter) {
           setState(() => _currentFilter = filter);
-          _customerBloc.add(LoadCustomers(
-            businessId: widget.businessId,
-            filter: _currentFilter,
-          ));
+          _customerBloc.add(
+            LoadCustomers(
+              businessId: widget.businessId,
+              filter: _currentFilter,
+            ),
+          );
         },
       ),
     );
@@ -431,13 +466,12 @@ class _CustomersPageState extends State<CustomersPage> {
         ),
       ),
     );
-    
+
     // اگر در صفحه جزئیات تغییری رخ داده (ویرایش یا حذف)، لیست را بروزرسانی کن
     if (result == true) {
-      _customerBloc.add(LoadCustomers(
-        businessId: widget.businessId,
-        filter: _currentFilter,
-      ));
+      _customerBloc.add(
+        LoadCustomers(businessId: widget.businessId, filter: _currentFilter),
+      );
     }
   }
 
@@ -456,10 +490,9 @@ class _CustomersPageState extends State<CustomersPage> {
     );
 
     if (result == true) {
-      _customerBloc.add(LoadCustomers(
-        businessId: widget.businessId,
-        filter: _currentFilter,
-      ));
+      _customerBloc.add(
+        LoadCustomers(businessId: widget.businessId, filter: _currentFilter),
+      );
     }
   }
 
@@ -479,10 +512,9 @@ class _CustomersPageState extends State<CustomersPage> {
     );
 
     if (result == true) {
-      _customerBloc.add(LoadCustomers(
-        businessId: widget.businessId,
-        filter: _currentFilter,
-      ));
+      _customerBloc.add(
+        LoadCustomers(businessId: widget.businessId, filter: _currentFilter),
+      );
     }
   }
 
@@ -616,15 +648,17 @@ class _FilterDialogState extends State<_FilterDialog> {
               value: _groupId,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
               items: [
                 const DropdownMenuItem(value: null, child: Text('همه')),
                 const DropdownMenuItem(value: 'null', child: Text('عمومی')),
-                ...widget.groups.map((g) => DropdownMenuItem(
-                  value: g.id,
-                  child: Text(g.name),
-                )),
+                ...widget.groups.map(
+                  (g) => DropdownMenuItem(value: g.id, child: Text(g.name)),
+                ),
               ],
               onChanged: (value) => setState(() => _groupId = value),
             ),

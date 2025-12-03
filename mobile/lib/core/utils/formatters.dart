@@ -57,3 +57,15 @@ class PhoneFormatter {
     return phone.replaceAll(RegExp(r'[^0-9]'), '');
   }
 }
+
+// Convenience class that delegates to specialized formatters
+class Formatters {
+  static String formatCurrency(num amount) => NumberFormatter.formatCurrency(amount);
+  static String formatNumber(num number) => NumberFormatter.formatNumber(number);
+  static String formatPercentage(num percentage) => NumberFormatter.formatPercentage(percentage);
+  static String formatPersianDate(DateTime date) => DateFormatter.formatPersianDate(date);
+  static String formatPersianDateTime(DateTime dateTime) => DateFormatter.formatPersianDateTime(dateTime);
+  static DateTime? parsePersianDate(String date) => DateFormatter.parsePersianDate(date);
+  static String formatPhone(String phone) => PhoneFormatter.formatPhone(phone);
+  static String cleanPhone(String phone) => PhoneFormatter.cleanPhone(phone);
+}

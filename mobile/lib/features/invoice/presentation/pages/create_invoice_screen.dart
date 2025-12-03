@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shamsi_date/shamsi_date.dart';
-import 'package:intl/intl.dart';
 import '../../data/models/invoice.dart';
 import '../../data/services/invoice_provider.dart';
 import '../widgets/invoice_type_selection_bottom_sheet.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/extensions/date_extensions.dart';
+import 'package:hivork_app/core/widgets/compact_persian_date_picker.dart';
 import '../../../customer/data/models/customer.dart';
 import '../../../customer/presentation/pages/customers_page.dart';
 import '../../../product/data/models/product.dart';
@@ -79,8 +79,12 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
     final invoice = widget.invoice!;
     _selectedType = invoice.type;
     _selectedDate = invoice.issueDate;
-    // Load customer - note: Invoice model doesn't have full customer object, only customerId/customerName
-    // We'll need to fetch customer separately if needed for edit mode
+    
+    // Load customer
+    if (invoice.customer != null) {
+      _selectedCustomer = invoice.customer;
+    }
+    
     _notesController.text = invoice.notes ?? '';
 
     // Load items
@@ -1389,17 +1393,16 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
   }
 
   Future<void> _selectDate() async {
-    final picked = await showDatePicker(
+    final jalaliDate = Jalali.fromDateTime(_selectedDate);
+    
+    final picked = await showCompactPersianDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2021, 3, 21), // 1400/1/1
-      lastDate: DateTime(2032, 3, 20), // 1410/12/29
-      locale: const Locale('fa', 'IR'),
+      initialDate: jalaliDate,
     );
 
     if (picked != null) {
       setState(() {
-        _selectedDate = picked;
+        _selectedDate = picked.toDateTime();
       });
     }
   }
@@ -1528,8 +1531,13 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
 
     final provider = context.read<InvoiceProvider>();
 
+    // Generate invoice number
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final invoiceNumber = 'INV-$timestamp';
+    
     final invoiceData = {
-      'type': _selectedType!.name,
+      'invoiceNumber': invoiceNumber,
+      'type': _selectedType!.value,
       'issueDate': _selectedDate
           .toIso8601String(), // تغییر از invoiceDate به issueDate
       'customerId': _selectedCustomer!.id,
@@ -1541,6 +1549,8 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
               'productName': item.productName, // اضافه کردن productName
               'quantity': item.quantity,
               'unitPrice': item.unitPrice,
+              if (_hasTax && _taxPercentageController.text.isNotEmpty)
+                'taxRate': double.parse(_taxPercentageController.text),
             },
           )
           .toList(),
@@ -1548,8 +1558,6 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
         'discountType': _discountType.name,
         'discountValue': double.parse(_discountValueController.text),
       },
-      if (_hasTax && _taxPercentageController.text.isNotEmpty)
-        'taxPercentage': double.parse(_taxPercentageController.text),
       if (_hasExtraCosts && _extraCosts.isNotEmpty)
         'extraCosts': _extraCosts
             .map(

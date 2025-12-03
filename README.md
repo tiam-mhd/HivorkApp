@@ -1,5 +1,7 @@
 # 🚀 Hivork - سیستم مدیریت مالی و کسب‌وکار
 
+cd mobile; dart run build_runner build --delete-conflicting-outputs
+
 ## 📋 درباره پروژه
 
 Hivork یک پلتفرم SaaS جامع برای مدیریت مالی و عملیات کسب‌وکارهای کوچک و متوسط است که شامل:

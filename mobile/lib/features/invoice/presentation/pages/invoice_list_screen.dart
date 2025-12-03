@@ -6,6 +6,7 @@ import '../widgets/invoice_card.dart';
 import '../widgets/invoice_empty_state.dart';
 import '../widgets/invoice_filter_bottom_sheet.dart';
 import 'create_invoice_screen.dart';
+import 'invoice_detail_screen.dart';
 
 class InvoiceListScreen extends StatefulWidget {
   const InvoiceListScreen({Key? key}) : super(key: key);
@@ -53,21 +54,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('فاکتورها'),
-        actions: [
-          // جستجو
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: _showSearchDialog,
-          ),
-          // فیلتر
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: _showFilterSheet,
-          ),
-        ],
-      ),
       body: Consumer<InvoiceProvider>(
         builder: (context, provider, child) {
           // Error State
@@ -164,6 +150,10 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                         onFinalize: invoice.status == InvoiceStatus.draft
                             ? () => _finalizeInvoice(invoice)
                             : null,
+                        onCancel: invoice.status == InvoiceStatus.finalized
+                            ? () => _cancelInvoice(invoice)
+                            : null,
+                        onDuplicate: () => _duplicateInvoice(invoice),
                       );
                     },
                   ),
@@ -305,19 +295,35 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   }
 
   void _viewInvoice(String id) {
-    Navigator.pushNamed(
+    Navigator.push(
       context,
-      '/invoices/detail',
-      arguments: id,
-    );
+      MaterialPageRoute(
+        builder: (context) => InvoiceDetailScreen(invoiceId: id),
+      ),
+    ).then((_) {
+      // Refresh list after returning from detail
+      context.read<InvoiceProvider>().loadInvoices(refresh: true);
+    });
   }
 
   void _editInvoice(String id) {
-    Navigator.pushNamed(
+    final provider = context.read<InvoiceProvider>();
+    // Find the invoice from the list
+    final invoice = provider.invoices.firstWhere((inv) => inv.id == id);
+    
+    Navigator.push(
       context,
-      '/invoices/edit',
-      arguments: id,
-    );
+      MaterialPageRoute(
+        builder: (context) => CreateInvoiceScreen(
+          invoice: invoice,
+          businessId: provider.businessId,
+        ),
+      ),
+    ).then((result) {
+      if (result == true) {
+        provider.loadInvoices(refresh: true);
+      }
+    });
   }
 
   Future<void> _deleteInvoice(Invoice invoice) async {
@@ -402,6 +408,97 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _cancelInvoice(Invoice invoice) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('لغو فاکتور'),
+        content: const Text(
+          'با لغو فاکتور، موجودی محصولات به انبار برگردانده می‌شود. آیا ادامه می‌دهید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('انصراف'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+            ),
+            child: const Text('لغو فاکتور'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final provider = context.read<InvoiceProvider>();
+      final success = await provider.cancelInvoice(
+        invoice.id ?? '',
+        'لغو توسط کاربر',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? 'فاکتور لغو و موجودی بازگردانده شد'
+                  : 'خطا: ${provider.error ?? "خطای ناشناخته"}',
+            ),
+            backgroundColor: success ? Colors.orange : Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _duplicateInvoice(Invoice invoice) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('کپی فاکتور'),
+        content: Text(
+          'آیا می‌خواهید کپی جدیدی از فاکتور ${invoice.invoiceNumber} بسازید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('کپی فاکتور'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final provider = context.read<InvoiceProvider>();
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CreateInvoiceScreen(
+            invoice: invoice,
+            businessId: provider.businessId,
+          ),
+        ),
+      ).then((result) {
+        if (result == true) {
+          provider.loadInvoices(refresh: true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('فاکتور جدید با موفقیت ساخته شد'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      });
     }
   }
 }

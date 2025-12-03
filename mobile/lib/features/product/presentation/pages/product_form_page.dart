@@ -3,13 +3,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/extensions/theme_extension.dart';
-import '../../../../core/utils/logger.dart';
 import '../../data/models/product.dart';
 import '../../data/models/product_category.dart';
 import '../../data/repositories/product_repository.dart';
 import '../../data/services/product_api_service.dart';
 import '../../data/services/category_api_service.dart';
 import '../../data/services/image_upload_service.dart';
+import '../../data/services/variant_api_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../bloc/product_bloc.dart';
 import '../widgets/product_attributes_tab.dart';
@@ -65,6 +65,9 @@ class _ProductFormPageState extends State<ProductFormPage>
 
   // Variants
   bool _hasVariants = false;
+  
+  // Track newly created product for variant management
+  Product? _createdProduct;
 
   // Images
   File? _mainImageFile;
@@ -72,15 +75,21 @@ class _ProductFormPageState extends State<ProductFormPage>
   Uint8List? _mainImageBytes; // برای وب
   List<Uint8List> _additionalImageBytes = []; // برای وب
   late ImageUploadService _imageUploadService;
+  late VariantApiService _variantApiService;
   bool _uploadingImages = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      // برای نمایش/مخفی کردن FloatingActionButton
+      setState(() {});
+    });
     final dio = ServiceLocator().dio;
     _productBloc = ProductBloc(ProductRepository(ProductApiService(dio)));
     _imageUploadService = ImageUploadService(dio);
+    _variantApiService = VariantApiService(dio);
     _loadCategories();
   }
 
@@ -135,7 +144,7 @@ class _ProductFormPageState extends State<ProductFormPage>
     _selectedUnit = product.unit;
     _selectedStatus = product.status;
     _trackInventory = product.trackInventory;
-    _hasVariants = product.hasVariants ?? false;
+    _hasVariants = product.hasVariants;
 
     // Set selected category if exists and categories are loaded
     if (product.category != null && _categories.isNotEmpty) {
@@ -230,6 +239,42 @@ class _ProductFormPageState extends State<ProductFormPage>
       productData['businessId'] = widget.businessId;
       _productBloc.add(CreateProduct(productData));
     }
+  }
+
+  Future<void> _confirmAndReturn() async {
+    if (_createdProduct == null) return;
+
+    // اگر محصول دارای تنوع است، باید حداقل یک تنوع ثبت شده باشد
+    if (_hasVariants) {
+      try {
+        final variants = await _variantApiService.getProductVariants(
+          _createdProduct!.id,
+          widget.businessId,
+        );
+
+        if (variants.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('لطفاً حداقل یک تنوع ثبت کنید یا گزینه "دارای تنوع" را بردارید'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          return;
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطا در بررسی تنوع‌ها: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        return;
+      }
+    }
+
+    // همه چیز اوکی است، محصول را برگردان
+    Navigator.pop(context, _createdProduct);
   }
 
   Future<void> _uploadProductImages(String productId) async {
@@ -351,10 +396,13 @@ class _ProductFormPageState extends State<ProductFormPage>
       child: BlocListener<ProductBloc, ProductState>(
         listener: (context, state) async {
           if (state is ProductOperationSuccess) {
-            // اگر محصول جدید ایجاد شد، عکس‌ها را آپلود کن
+            // اگر محصول جدید ایجاد شد
             if (widget.product == null && state.message.contains('ایجاد')) {
-              // باید productId را از response بگیریم
-              // فعلاً فقط پیام موفقیت نمایش می‌دهیم
+              // محصول ایجاد شده را ذخیره کن
+              setState(() {
+                _createdProduct = state.product;
+              });
+              
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: const Text('محصول با موفقیت ایجاد شد'),
@@ -371,6 +419,14 @@ class _ProductFormPageState extends State<ProductFormPage>
                     duration: Duration(seconds: 4),
                   ),
                 );
+              }
+
+              // اگر دارای تنوع است، به تب ویژگی‌ها برو
+              if (_hasVariants) {
+                _tabController.animateTo(1); // برو به تب دوم
+              } else {
+                // اگر دارای تنوع نیست، محصول را برگردان
+                Navigator.pop(context, state.product);
               }
             } else if (widget.product != null) {
               // در حالت ویرایش، عکس‌ها را آپلود کن
@@ -392,8 +448,6 @@ class _ProductFormPageState extends State<ProductFormPage>
                 ),
               );
             }
-            
-            Navigator.pop(context, true);
           } else if (state is ProductError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -883,7 +937,7 @@ class _ProductFormPageState extends State<ProductFormPage>
                   ),
 
                   // Tab 2: ویژگی‌ها و تنوع
-                  widget.product?.id == null
+                  _createdProduct == null && widget.product?.id == null
                       ? Center(
                           child: Padding(
                             padding: const EdgeInsets.all(32.0),
@@ -915,7 +969,7 @@ class _ProductFormPageState extends State<ProductFormPage>
                           ),
                         )
                       : ProductAttributesTab(
-                          productId: widget.product!.id,
+                          productId: _createdProduct?.id ?? widget.product!.id,
                           businessId: widget.businessId,
                           productName: _nameController.text.isNotEmpty
                               ? _nameController.text
@@ -929,6 +983,15 @@ class _ProductFormPageState extends State<ProductFormPage>
               );
             },
           ),
+          // دکمه شناور برای تایید و بازگشت در تب ویژگی‌ها
+          floatingActionButton: _createdProduct != null && _tabController.index == 1
+              ? FloatingActionButton.extended(
+                  onPressed: _confirmAndReturn,
+                  icon: const Icon(Icons.check),
+                  label: const Text('تایید و بازگشت'),
+                  backgroundColor: theme.colorScheme.primary,
+                )
+              : null,
         ),
       ),
     );

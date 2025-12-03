@@ -26,26 +26,24 @@ class InvoiceService {
   }) async {
     try {
       final queryParams = {
-        'businessId': businessId,
         'page': page,
         'limit': limit,
         if (search != null && search.isNotEmpty) 'search': search,
         if (type != null) 'type': type.value,
         if (status != null) 'status': status.value,
-        if (paymentStatus != null) 'paymentStatus': paymentStatus.value,
-        if (shippingStatus != null) 'shippingStatus': shippingStatus.value,
         if (customerId != null) 'customerId': customerId,
-        if (fromDate != null) 'fromDate': fromDate.toIso8601String(),
-        if (toDate != null) 'toDate': toDate.toIso8601String(),
+        if (fromDate != null) 'issueDateFrom': fromDate.toIso8601String(),
+        if (toDate != null) 'issueDateTo': toDate.toIso8601String(),
         if (minAmount != null) 'minAmount': minAmount,
         if (maxAmount != null) 'maxAmount': maxAmount,
-        'sortBy': sortBy,
-        'sortOrder': sortOrder,
       };
 
       final response = await dio.get(
         '/invoices',
-        queryParameters: queryParams,
+        queryParameters: {
+          ...queryParams,
+          'businessId': businessId,
+        },
       );
 
       return {
@@ -79,10 +77,12 @@ class InvoiceService {
       print('🔵 [INVOICE] Creating invoice for business: $businessId');
       print('🔵 [INVOICE] Data: $data');
       
+      // Add businessId to request body
+      final requestData = {...data, 'businessId': businessId};
+      
       final response = await dio.post(
         '/invoices',
-        data: data,
-        queryParameters: {'businessId': businessId},
+        data: requestData,
       );
       
       print('✅ [INVOICE] Invoice created successfully');
@@ -205,7 +205,7 @@ class InvoiceService {
   }) async {
     try {
       final response = await dio.post(
-        '/invoices/$id/payments',
+        '/invoices/$id/payment',
         data: data,
         queryParameters: {'businessId': businessId},
       );

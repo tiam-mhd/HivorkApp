@@ -1,0 +1,11 @@
+# Hivork App Icon
+
+این فایل یک placeholder است.
+
+لطفاً تصویر آیکون نارنجی شش‌ضلعی را با نام `app_icon.png` (1024x1024) در این مکان قرار دهید.
+
+سپس دستور زیر را اجرا کنید:
+```bash
+flutter pub get
+flutter pub run flutter_launcher_icons
+```

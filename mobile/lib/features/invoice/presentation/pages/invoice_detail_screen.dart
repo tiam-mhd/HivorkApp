@@ -4,8 +4,10 @@ import '../../data/models/invoice.dart';
 import '../../data/services/invoice_provider.dart';
 import '../../data/services/invoice_pdf_service.dart';
 import '../widgets/invoice_status_badge.dart';
+import '../widgets/add_payment_dialog.dart';
 import '../../../../core/utils/number_formatter.dart';
 import '../../../../core/extensions/date_extensions.dart';
+import 'create_invoice_screen.dart';
 
 class InvoiceDetailScreen extends StatefulWidget {
   final String invoiceId;
@@ -62,6 +64,28 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
             PopupMenuButton(
               icon: const Icon(Icons.more_vert_rounded),
               itemBuilder: (context) => [
+                if (invoice.status == InvoiceStatus.draft)
+                  PopupMenuItem(
+                    value: 'finalize',
+                    child: Row(
+                      children: const [
+                        Icon(Icons.check_circle_rounded, size: 20, color: Colors.green),
+                        SizedBox(width: 12),
+                        Text('تایید و کسر موجودی', style: TextStyle(color: Colors.green)),
+                      ],
+                    ),
+                  ),
+                if (invoice.status == InvoiceStatus.finalized)
+                  PopupMenuItem(
+                    value: 'cancel',
+                    child: Row(
+                      children: const [
+                        Icon(Icons.cancel_rounded, size: 20, color: Colors.orange),
+                        SizedBox(width: 12),
+                        Text('لغو و بازگشت موجودی', style: TextStyle(color: Colors.orange)),
+                      ],
+                    ),
+                  ),
                 PopupMenuItem(
                   value: 'duplicate',
                   child: Row(
@@ -84,10 +108,14 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                 ),
               ],
               onSelected: (value) {
-                if (value == 'duplicate') {
-                  _duplicateInvoice(invoice!);
+                if (value == 'finalize') {
+                  _finalizeInvoice(invoice);
+                } else if (value == 'cancel') {
+                  _cancelInvoice(invoice);
+                } else if (value == 'duplicate') {
+                  _duplicateInvoice(invoice);
                 } else if (value == 'delete') {
-                  _deleteInvoice(invoice!);
+                  _deleteInvoice(invoice);
                 }
               },
             ),
@@ -115,13 +143,20 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                             _buildItemsTable(invoice, theme),
                             const SizedBox(height: 16),
                             _buildTotals(invoice, theme),
+                            if (invoice.type == InvoiceType.sales &&
+                                invoice.status == InvoiceStatus.finalized &&
+                                (invoice.paymentStatus == PaymentStatus.unpaid ||
+                                    invoice.paymentStatus == PaymentStatus.partial)) ...[  
+                              const SizedBox(height: 16),
+                              _buildPaymentButton(invoice, theme),
+                            ],
                             if (invoice.discountAmount > 0 ||
                                 invoice.taxAmount > 0 ||
-                                (invoice.extraCosts?.isNotEmpty ?? false)) ...[
+                                (invoice.extraCosts.isNotEmpty)) ...[
                               const SizedBox(height: 16),
                               _buildAdditionalCharges(invoice, theme),
                             ],
-                            if (invoice.payments?.isNotEmpty ?? false) ...[
+                            if (invoice.payments.isNotEmpty) ...[
                               const SizedBox(height: 16),
                               _buildPayments(invoice, theme),
                             ],
@@ -442,9 +477,9 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                 ),
               ],
             ),
-            if (invoice.extraCosts?.isNotEmpty ?? false) ...[
+            if (invoice.extraCosts.isNotEmpty) ...[
               const SizedBox(height: 16),
-              ...invoice.extraCosts!.map((cost) => Padding(
+              ...invoice.extraCosts.map((cost) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: _buildInfoRow(
                       cost.description ?? 'بدون توضیح',
@@ -486,10 +521,10 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: invoice.payments!.length,
+              itemCount: invoice.payments.length,
               separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
-                final payment = invoice.payments![index];
+                final payment = invoice.payments[index];
                 return _buildPaymentRow(payment, theme);
               },
             ),
@@ -708,6 +743,82 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     );
   }
 
+  Widget _buildPaymentButton(Invoice invoice, ThemeData theme) {
+    final remainingAmount = invoice.totalAmount - 
+        invoice.payments.fold<double>(0, (sum, p) => sum + p.amount);
+    
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'مانده قابل پرداخت',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      NumberFormatter.formatCurrency(remainingAmount),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ),
+                FilledButton.icon(
+                  onPressed: () => _showPaymentDialog(invoice, remainingAmount),
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  label: const Text('ثبت پرداخت'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showPaymentDialog(Invoice invoice, double remainingAmount) async {
+    final paymentData = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => AddPaymentDialog(
+        invoice: invoice,
+        remainingAmount: remainingAmount,
+      ),
+    );
+
+    if (paymentData != null && mounted) {
+      final provider = context.read<InvoiceProvider>();
+      final success = await provider.addPayment(invoice.id ?? '', paymentData);
+      
+      if (mounted) {
+        if (success && provider.error == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('پرداخت با موفقیت ثبت شد'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          await _loadInvoice();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('خطا: ${provider.error}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Widget _buildError(String error) {
     return Center(
       child: Column(
@@ -823,18 +934,188 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
     }
   }
 
-  void _editInvoice(Invoice invoice) {
-    // TODO: Navigate to edit screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('صفحه ویرایش به‌زودی اضافه می‌شود')),
+  Future<void> _editInvoice(Invoice invoice) async {
+    if (invoice.status != InvoiceStatus.draft) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('فقط فاکتورهای پیش‌نویس قابل ویرایش هستند'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateInvoiceScreen(
+          invoice: invoice,
+          businessId: context.read<InvoiceProvider>().businessId,
+        ),
+      ),
     );
+
+    if (result == true && mounted) {
+      await _loadInvoice();
+    }
   }
 
   Future<void> _duplicateInvoice(Invoice invoice) async {
-    // TODO: Implement duplicate functionality
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('قابلیت کپی فاکتور به‌زودی اضافه می‌شود')),
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('کپی فاکتور'),
+        content: const Text('آیا می‌خواهید کپی جدیدی از این فاکتور بسازید؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('کپی فاکتور'),
+          ),
+        ],
+      ),
     );
+
+    if (confirmed == true && mounted) {
+      // Create new invoice with same data but as draft
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CreateInvoiceScreen(
+            invoice: invoice,
+            businessId: context.read<InvoiceProvider>().businessId,
+          ),
+        ),
+      );
+
+      if (result == true && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('فاکتور جدید با موفقیت ساخته شد'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _finalizeInvoice(Invoice invoice) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تایید فاکتور'),
+        content: const Text(
+          'با تایید فاکتور، موجودی محصولات از انبار کسر می‌شود.\n\nآیا ادامه می‌دهید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('انصراف'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('تایید و کسر موجودی'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final provider = context.read<InvoiceProvider>();
+        await provider.finalizeInvoice(invoice.id ?? '');
+        
+        if (mounted) {
+          if (provider.error == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('فاکتور با موفقیت تایید و موجودی کسر شد'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            await _loadInvoice(); // Reload to show updated status
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('خطا: ${provider.error}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('خطا در تایید فاکتور: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _cancelInvoice(Invoice invoice) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('لغو فاکتور'),
+        content: const Text(
+          'با لغو فاکتور، موجودی محصولات به انبار برگردانده می‌شود.\n\nآیا ادامه می‌دهید؟',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('انصراف'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('لغو و بازگشت موجودی'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        final provider = context.read<InvoiceProvider>();
+        await provider.cancelInvoice(invoice.id ?? '', 'لغو توسط کاربر');
+        
+        if (mounted) {
+          if (provider.error == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('فاکتور لغو و موجودی بازگردانده شد'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            await _loadInvoice(); // Reload to show updated status
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('خطا: ${provider.error}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('خطا در لغو فاکتور: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _deleteInvoice(Invoice invoice) async {

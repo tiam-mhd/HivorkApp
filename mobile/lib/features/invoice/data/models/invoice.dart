@@ -27,7 +27,7 @@ int _parseInt(dynamic value, [int defaultValue = 0]) {
 
 // Enums
 enum InvoiceType {
-  sales('sales', 'فاکتور فروش'),
+  sales('sale', 'فاکتور فروش'),
   proforma('proforma', 'پیش‌فاکتور'),
   purchase('purchase', 'فاکتور خرید'),
   returned('return', 'فاکتور برگشتی');
@@ -119,8 +119,9 @@ enum DiscountType {
 enum PaymentMethod {
   cash('cash', 'نقد'),
   card('card', 'کارت'),
-  check('check', 'چک'),
-  bankTransfer('bank_transfer', 'انتقال بانکی'),
+  bank('bank_transfer', 'انتقال بانکی'),
+  cheque('check', 'چک'),
+  online('online', 'پرداخت آنلاین'),
   credit('credit', 'اعتباری'),
   other('other', 'سایر');
 

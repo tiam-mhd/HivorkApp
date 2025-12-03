@@ -197,8 +197,8 @@ class _ProductVariantSelectionScreenState
     }
     
     // قیمت و موجودی
-    final price = variant?.salePrice ?? product.salePrice ?? 0;
-    final stock = variant?.currentStock ?? product.currentStock ?? 0;
+    final price = variant?.salePrice ?? product.salePrice;
+    final stock = variant?.currentStock ?? product.currentStock;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 8),

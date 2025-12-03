@@ -14,6 +14,12 @@ import 'home_tab_page.dart';
 import 'customers_tab_page.dart';
 import 'invoices_tab_page.dart';
 import 'expenses_tab_page.dart';
+import '../widgets/animated_speed_dial_fab.dart';
+import '../../data/providers/dashboard_provider.dart';
+import '../../../product/data/services/product_api_service.dart';
+import '../../../customer/data/services/customer_api_service.dart';
+import '../../../invoice/data/services/invoice_service.dart';
+import '../../../expense/services/expense_api_service.dart';
 
 class MainDashboardPage extends StatefulWidget {
   const MainDashboardPage({super.key});
@@ -37,15 +43,15 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
   
   List<Widget> _getTabPages() {
     return [
-      HomeTabPage(activeBusiness: _activeBusiness),
+      HomeTabPage(activeBusiness: _activeBusiness, scaffoldKey: _scaffoldKey),
       _activeBusiness != null 
-          ? ProductsPage(businessId: _activeBusiness!.id)
+          ? ProductsPage(businessId: _activeBusiness!.id, scaffoldKey: _scaffoldKey)
           : Center(child: Text('لطفاً کسب‌وکار را انتخاب کنید')),
       _activeBusiness != null
-          ? CustomersTabPage(businessId: _activeBusiness!.id)
+          ? CustomersTabPage(businessId: _activeBusiness!.id, scaffoldKey: _scaffoldKey)
           : Center(child: Text('لطفاً کسب‌وکار را انتخاب کنید')),
-      InvoicesTabPage(businessId: _activeBusiness?.id),
-      const ExpensesTabPage(),
+      InvoicesTabPage(businessId: _activeBusiness?.id, scaffoldKey: _scaffoldKey),
+      ExpensesTabPage(businessId: _activeBusiness?.id, scaffoldKey: _scaffoldKey),
     ];
   }
 
@@ -137,88 +143,32 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final dio = ServiceLocator().dio;
     
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: theme.scaffoldBackgroundColor,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => DashboardProvider(
+            ProductApiService(dio),
+            CustomerApiService(dio),
+            InvoiceService(dio),
+            ExpenseApiService(dio),
+          ),
+        ),
+      ],
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: theme.scaffoldBackgroundColor,
       
-      // App Bar
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: theme.colorScheme.surface,
-        leading: IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.menu_rounded,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-          onPressed: () {
-            _scaffoldKey.currentState?.openDrawer();
-          },
-        ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
-              'assets/images/branding/Logo.png',
-              height: 32,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'هایورک',
-              style: TextStyle(
-                color: theme.colorScheme.onSurface,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
-            ),
-          ],
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.notifications_outlined,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            onPressed: () {
-              // Handle notifications
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-
-      // Drawer (Side Menu)
-      drawer: _buildDrawer(),
+        // Drawer (Side Menu)
+        drawer: _buildDrawer(),
 
       // Body
       body: SafeArea(
         child: _isLoadingBusinesses
             ? const Center(child: CircularProgressIndicator())
             : _activeBusiness != null
-                ? Column(
-                    children: [
-                      // Tab Content
-                      Expanded(
-                        child: _getTabPages()[_currentIndex],
-                      ),
-                    ],
-                  )
+                ? _getTabPages()[_currentIndex]
                 : Center(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.all(16),
@@ -260,13 +210,9 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             decoration: BoxDecoration(
-                              gradient: isActive
-                                  ? LinearGradient(
-                                      colors: [theme.colorScheme.primary, theme.colorScheme.primaryContainer],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    )
-                                  : null,
+                              color: isActive
+                                  ? theme.colorScheme.primaryContainer
+                                  : Colors.transparent,
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Column(
@@ -274,7 +220,7 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                               children: [
                                 Icon(
                                   isActive ? item['activeIcon'] : item['icon'],
-                                  color: isActive ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
+                                  color: isActive ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onSurfaceVariant,
                                   size: 24,
                                 ),
                                 const SizedBox(height: 4),
@@ -283,7 +229,7 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                                    color: isActive ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
+                                    color: isActive ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
@@ -297,6 +243,12 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
               ),
             )
           : null,
+      
+      // Animated Speed Dial FAB - فقط در تب خانه
+      floatingActionButton: _currentIndex == 0 && _activeBusiness != null
+          ? AnimatedSpeedDialFAB(activeBusiness: _activeBusiness)
+          : null,
+      ),
     );
   }
 
@@ -673,6 +625,34 @@ class _MainDashboardPageState extends State<MainDashboardPage> {
                     isActive: true,
                     onTap: () {
                       Navigator.pop(context);
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.local_shipping_outlined,
+                    title: 'تامین‌کنندگان',
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (_activeBusiness != null) {
+                        context.push('/suppliers', extra: _activeBusiness!.id);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('لطفاً ابتدا کسب‌وکار را انتخاب کنید')),
+                        );
+                      }
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.shopping_cart_outlined,
+                    title: 'سفارشات خرید',
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (_activeBusiness != null) {
+                        context.push('/purchase-orders', extra: _activeBusiness!.id);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('لطفاً ابتدا کسب‌وکار را انتخاب کنید')),
+                        );
+                      }
                     },
                   ),
                   const Divider(height: 24, indent: 16, endIndent: 16),

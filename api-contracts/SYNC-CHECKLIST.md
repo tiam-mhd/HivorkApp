@@ -1,6 +1,6 @@
 # ✅ Sync Checklist - وضعیت همگام‌سازی Backend و Flutter
 
-تاریخ آخرین بروزرسانی: 2025-01-16
+تاریخ آخرین بروزرسانی: 2025-12-01
 
 ---
 
@@ -10,9 +10,90 @@
 |-------|---------|---------|---------|-------|
 | Auth | ✅ | ✅ | ✅ | همگام |
 | Business | ✅ | ✅ | ✅ | همگام |
-| **Product** | ✅ | ✅ | ✅ | **همگام - جدید** |
-| Customer | ⏳ | ⏳ | ❌ | در انتظار |
+| Product | ✅ | ✅ | ✅ | همگام |
+| Customer | ✅ | ✅ | ✅ | همگام |
+| **Expense** | ✅ | ✅ | ✅ | **همگام - جدید** |
 | Invoice | ⏳ | ⏳ | ❌ | در انتظار |
+
+---
+
+## 🆕 Expense Module - SYNCED ✅
+
+**تاریخ**: 2025-12-01  
+**وضعیت**: ✅ کامل و همگام (Phase 1 MVP)
+
+### Backend
+- ✅ Entities: 
+  - `expense-category.entity.ts` (با سلسله‌مراتب والد-فرزند)
+  - `expense.entity.ts` (با soft delete)
+- ✅ DTOs: 
+  - Category: `create`, `update`
+  - Expense: `create`, `update`, `filter`
+- ✅ Services: 
+  - `expense-category.service.ts` - 9 methods
+  - `expense.service.ts` - 15 methods
+- ✅ Controllers: 
+  - `expense-category.controller.ts` - 7 endpoints
+  - `expense.controller.ts` - 15 endpoints
+- ✅ Enums: `PaymentMethod`, `PaymentStatus`, `ReferenceType`
+- ✅ Default Data: 8 دسته پیش‌فرض فارسی با زیرمجموعه
+
+### Flutter
+- ✅ Models: 
+  - `expense_category.dart` (با children)
+  - `expense.dart` (کامل با category)
+  - `expense_stats.dart` (با breakdown)
+- ✅ Services:
+  - `expense_category_api_service.dart` - 7 methods
+  - `expense_api_service.dart` - 15 methods
+- ✅ Provider: `expense_provider.dart` - state management کامل
+- ✅ UI Pages: 
+  - `expenses_page.dart` (لیست با filter)
+  - `expense_form_page.dart` (create/edit/delete)
+  - `expense_stats_page.dart` (dashboard با نمودار)
+- ✅ Integration: 
+  - `expenses_tab_page.dart` در MainDashboard
+  - ExpenseProvider در main.dart
+  - Navigation کامل
+- ✅ Zero Hardcoded Values: تمام businessId از context
+
+### API Contract
+- ✅ مستندات: `api-contracts/expense-api.md`
+- ✅ 22 Endpoints کامل مستند شده
+- ✅ تمام DTOs و Response Types
+- ✅ Error Handling
+- ✅ Enums با برچسب فارسی
+
+### Features Implemented (Phase 1)
+- ✅ CRUD کامل برای هزینه‌ها
+- ✅ CRUD کامل برای دسته‌بندی‌ها
+- ✅ سلسله‌مراتب دسته‌ها (parent-child)
+- ✅ 8 دسته پیش‌فرض سیستمی
+- ✅ فیلتر پیشرفته (category, payment method, date range, amount)
+- ✅ جستجو در عنوان و توضیحات
+- ✅ آمار کامل:
+  - مجموع روزانه، ماهانه، سالانه
+  - تفکیک بر اساس دسته (pie chart)
+  - تغییرات ماهانه (درصد)
+  - تعداد کل هزینه‌ها
+- ✅ Soft delete
+- ✅ File upload endpoints (backend ready)
+- ✅ Approval workflow endpoints
+- ✅ Tags support
+- ✅ Payment status tracking
+- ✅ Pull-to-refresh
+- ✅ Empty states
+- ✅ Error handling
+
+### Pending Tasks (Phase 2)
+- [ ] Recurring Expenses (entity + UI)
+- [ ] Budget Management (per category)
+- [ ] File Upload UI (camera + gallery)
+- [ ] Image/PDF preview
+- [ ] Trend analysis (line charts)
+- [ ] Period comparison
+- [ ] Export to Excel/PDF
+- [ ] Advanced analytics
 
 ---
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/models/invoice.dart';
 import 'invoice_status_badge.dart';
 import '../../../../core/utils/number_formatter.dart';
+import '../../../../core/extensions/date_extensions.dart';
 
 class InvoiceCard extends StatelessWidget {
   final Invoice invoice;
@@ -9,6 +10,8 @@ class InvoiceCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
   final VoidCallback? onFinalize;
+  final VoidCallback? onCancel;
+  final VoidCallback? onDuplicate;
 
   const InvoiceCard({
     Key? key,
@@ -17,134 +20,316 @@ class InvoiceCard extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onFinalize,
+    this.onCancel,
+    this.onDuplicate,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final cardColor = theme.cardColor;
-    final borderColor = theme.dividerColor.withOpacity(isDark ? 0.25 : 0.15);
-    final textColor = theme.colorScheme.onSurface;
 
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onEdit != null || onDelete != null
-          ? () => _showContextMenu(context)
-          : null,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: borderColor,
-            width: 1,
-          ),
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: theme.colorScheme.outline.withOpacity(0.2),
         ),
-        child: Row(
-          children: [
-            // آیکون نوع - کوچکتر
-            Icon(
-              invoice.type == InvoiceType.sales
-                  ? Icons.receipt_long_outlined
-                  : Icons.description_outlined,
-              size: 20,
-              color: theme.colorScheme.primary.withOpacity(0.7),
-            ),
-            const SizedBox(width: 10),
-
-            // اطلاعات اصلی
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Row
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          invoice.invoiceNumber,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: textColor,
+                  // Invoice Number & Type Icon
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: _getTypeColor(invoice.type).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(
+                            _getTypeIcon(invoice.type),
+                            size: 16,
+                            color: _getTypeColor(invoice.type),
                           ),
                         ),
-                      ),
-                      InvoiceStatusBadge(
-                        status: invoice.status,
-                        type: InvoiceStatusBadgeType.status,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    invoice.customerName ?? 'نامشخص',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                invoice.invoiceNumber,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                invoice.type.label,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  ),
+                  // Status Badge
+                  InvoiceStatusBadge(
+                    status: invoice.status,
+                    type: InvoiceStatusBadgeType.status,
+                  ),
+                  // Menu
+                  PopupMenuButton(
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      size: 20,
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    itemBuilder: (context) => [
+                      if (invoice.status == InvoiceStatus.draft && onFinalize != null)
+                        PopupMenuItem(
+                          value: 'finalize',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 18,
+                                color: Colors.green,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'تایید و کسر موجودی',
+                                style: TextStyle(color: Colors.green),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (invoice.status == InvoiceStatus.finalized && onCancel != null)
+                        PopupMenuItem(
+                          value: 'cancel',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.cancel_rounded,
+                                size: 18,
+                                color: Colors.orange,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'لغو فاکتور',
+                                style: TextStyle(color: Colors.orange),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (invoice.status == InvoiceStatus.draft && onEdit != null)
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_rounded, size: 18),
+                              const SizedBox(width: 8),
+                              Text('ویرایش'),
+                            ],
+                          ),
+                        ),
+                      if (onDuplicate != null)
+                        PopupMenuItem(
+                          value: 'duplicate',
+                          child: Row(
+                            children: [
+                              Icon(Icons.copy_rounded, size: 18),
+                              const SizedBox(width: 8),
+                              Text('کپی فاکتور'),
+                            ],
+                          ),
+                        ),
+                      if (invoice.status == InvoiceStatus.draft && onDelete != null)
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.delete_rounded,
+                                size: 18,
+                                color: Colors.red,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'حذف',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'finalize':
+                          onFinalize?.call();
+                          break;
+                        case 'cancel':
+                          onCancel?.call();
+                          break;
+                        case 'edit':
+                          onEdit?.call();
+                          break;
+                        case 'duplicate':
+                          onDuplicate?.call();
+                          break;
+                        case 'delete':
+                          onDelete?.call();
+                          break;
+                      }
+                    },
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 8),
+              const SizedBox(height: 8),
+              Divider(height: 1, color: theme.colorScheme.outline.withOpacity(0.2)),
+              const SizedBox(height: 8),
 
-            // مبلغ
-            Text(
-              NumberFormatter.formatCurrency(invoice.totalAmount),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.primary,
+              // Customer & Date Row
+              Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.person_outline_rounded,
+                          size: 14,
+                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            invoice.customerName ?? 'نامشخص',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today_rounded,
+                        size: 14,
+                        color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        invoice.issueDate.toPersianDate(),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+
+              // Amount & Payment Status Row
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'مبلغ:',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              NumberFormatter.formatCurrency(invoice.totalAmount),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                              ),
+                              textAlign: TextAlign.left,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (invoice.type == InvoiceType.sales && 
+                      invoice.paymentStatus != null) ...[
+                    const SizedBox(width: 8),
+                    InvoiceStatusBadge(
+                      status: invoice.paymentStatus!,
+                      type: InvoiceStatusBadgeType.payment,
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _showContextMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (onFinalize != null && invoice.status == InvoiceStatus.draft)
-              ListTile(
-                leading: const Icon(Icons.check_circle_outline, color: Colors.green),
-                title: const Text('نهایی کردن'),
-                onTap: () {
-                  Navigator.pop(context);
-                  onFinalize!();
-                },
-              ),
-            if (onEdit != null && invoice.status == InvoiceStatus.draft)
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('ویرایش'),
-                onTap: () {
-                  Navigator.pop(context);
-                  onEdit!();
-                },
-              ),
-            if (onDelete != null && invoice.status == InvoiceStatus.draft)
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text('حذف'),
-                onTap: () {
-                  Navigator.pop(context);
-                  onDelete!();
-                },
-              ),
-          ],
-        ),
-      ),
-    );
+  IconData _getTypeIcon(InvoiceType type) {
+    switch (type) {
+      case InvoiceType.sales:
+        return Icons.shopping_cart_rounded;
+      case InvoiceType.proforma:
+        return Icons.description_rounded;
+      case InvoiceType.purchase:
+        return Icons.shopping_bag_rounded;
+      case InvoiceType.returned:
+        return Icons.keyboard_return_rounded;
+      default:
+        return Icons.receipt_long_rounded;
+    }
+  }
+
+  Color _getTypeColor(InvoiceType type) {
+    switch (type) {
+      case InvoiceType.sales:
+        return Colors.green;
+      case InvoiceType.proforma:
+        return Colors.blue;
+      case InvoiceType.purchase:
+        return Colors.orange;
+      case InvoiceType.returned:
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 }

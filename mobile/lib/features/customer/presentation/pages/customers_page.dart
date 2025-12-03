@@ -5,7 +5,6 @@ import '../../data/models/customer.dart';
 import '../../data/models/customer_filter.dart';
 import '../../data/models/customer_group.dart';
 import '../../data/repositories/customer_repository.dart';
-import '../../data/repositories/customer_group_repository.dart';
 import '../../data/services/customer_api_service.dart';
 import '../../data/services/customer_group_api_service.dart';
 import '../bloc/customer_bloc.dart';
@@ -16,6 +15,7 @@ import 'customer_groups_management_page.dart';
 
 class CustomersPage extends StatefulWidget {
   final String businessId;
+  final GlobalKey<ScaffoldState>? scaffoldKey;
   final CustomerFilter? initialFilter;
   final bool selectionMode; // برای حالت انتخاب مشتری در فاکتور
   final Customer? selectedCustomer; // مشتری انتخاب شده قبلی
@@ -23,6 +23,7 @@ class CustomersPage extends StatefulWidget {
   const CustomersPage({
     Key? key,
     required this.businessId,
+    this.scaffoldKey,
     this.initialFilter,
     this.selectionMode = false,
     this.selectedCustomer,
@@ -116,14 +117,15 @@ class _CustomersPageState extends State<CustomersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    
     return BlocProvider.value(
       value: _customerBloc,
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(widget.selectionMode ? 'انتخاب مشتری' : 'مشتریان'),
-          actions: widget.selectionMode
-              ? [
-                  // در حالت انتخاب فقط دکمه افزودن مشتری جدید
+        appBar: widget.selectionMode
+            ? AppBar(
+                title: const Text('انتخاب مشتری'),
+                actions: [
                   IconButton(
                     icon: const Icon(Icons.add_rounded),
                     tooltip: 'مشتری جدید',
@@ -131,32 +133,68 @@ class _CustomersPageState extends State<CustomersPage> {
                       final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => BlocProvider.value(
-                            value: _customerBloc,
-                            child: CustomerFormPage(
-                              businessId: widget.businessId,
-                              groups: _groups,
-                              isSelectionMode: widget.selectionMode,
-                            ),
+                          builder: (context) => CustomerFormPage(
+                            businessId: widget.businessId,
                           ),
                         ),
                       );
-                      // اگر در حالت انتخاب هستیم و نتیجه یک مشتری جدید بود، همان مشتری را انتخاب و بازگردان
-                      if (widget.selectionMode && result is Customer) {
-                        Navigator.pop(context, result);
-                      } else if (result == true) {
-                        _customerBloc.add(
-                          LoadCustomers(
-                            businessId: widget.businessId,
-                            filter: _currentFilter,
-                          ),
-                        );
+                      if (result == true) {
+                        _customerBloc.add(LoadCustomers(
+                          businessId: widget.businessId,
+                          filter: _currentFilter,
+                        ));
                       }
                     },
                   ),
-                ]
-              : [
-                  // گروه‌بندی
+                ],
+              )
+            : AppBar(
+                backgroundColor: theme.scaffoldBackgroundColor,
+                elevation: 0,
+                leading: IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.menu_rounded,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  onPressed: () {
+                    widget.scaffoldKey?.currentState?.openDrawer();
+                  },
+                ),
+                title: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.people,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'مشتریان',
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurface,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ],
+                ),
+                centerTitle: true,
+                actions: [
                   IconButton(
                     icon: const Icon(Icons.folder_special),
                     tooltip: 'مدیریت گروه‌بندی',
@@ -170,26 +208,23 @@ class _CustomersPageState extends State<CustomersPage> {
                         ),
                       );
                       _loadGroups();
-                      _customerBloc.add(
-                        LoadCustomers(
-                          businessId: widget.businessId,
-                          filter: _currentFilter,
-                        ),
-                      );
+                      _customerBloc.add(LoadCustomers(
+                        businessId: widget.businessId,
+                        filter: _currentFilter,
+                      ));
                     },
                   ),
-                  // جستجو
                   IconButton(
                     icon: const Icon(Icons.search),
                     onPressed: _showSearchDialog,
                   ),
-                  // فیلتر
                   IconButton(
                     icon: const Icon(Icons.filter_list),
                     onPressed: _showFilterDialog,
                   ),
+                  const SizedBox(width: 8),
                 ],
-        ),
+              ),
         body: Column(
           children: [
             // Group filter chips
@@ -372,9 +407,10 @@ class _CustomersPageState extends State<CustomersPage> {
         ),
         floatingActionButton: widget.selectionMode
             ? null
-            : FloatingActionButton(
+            : FloatingActionButton.extended(
                 onPressed: _navigateToCreate,
-                child: const Icon(Icons.add),
+                icon: const Icon(Icons.add),
+                label: const Text('مشتری جدید'),
               ),
       ),
     );

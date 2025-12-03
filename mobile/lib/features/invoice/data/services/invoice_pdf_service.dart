@@ -1,10 +1,11 @@
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import '../models/invoice.dart';
-import '../../../business/data/models/business_model.dart';
-import '../../../customer/data/models/customer.dart';
+import '../../../../core/utils/number_formatter.dart';
+import '../../../../core/extensions/date_extensions.dart';
 
 /// سرویس تولید PDF فاکتور
 class InvoicePdfService {
@@ -12,9 +13,12 @@ class InvoicePdfService {
   Future<Uint8List> generateInvoicePdf(Invoice invoice) async {
     final pdf = pw.Document();
 
-    // بارگذاری فونت فارسی
-    final font = await PdfGoogleFonts.notoSansArabicRegular();
-    final fontBold = await PdfGoogleFonts.notoSansArabicBold();
+    // بارگذاری فونت Vazirmatn فارسی از assets
+    final fontData = await rootBundle.load('assets/fonts/Vazirmatn-Regular.ttf');
+    final fontBoldData = await rootBundle.load('assets/fonts/Vazirmatn-Bold.ttf');
+    
+    final font = pw.Font.ttf(fontData);
+    final fontBold = pw.Font.ttf(fontBoldData);
 
     pdf.addPage(
       pw.MultiPage(
@@ -219,13 +223,14 @@ class InvoicePdfService {
         3: const pw.FlexColumnWidth(2), // قیمت واحد
         4: const pw.FlexColumnWidth(2), // جمع
       },
+      defaultColumnWidth: const pw.IntrinsicColumnWidth(),
       children: [
         // Header
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey200),
           children: [
             _buildTableHeader('ردیف'),
-            _buildTableHeader('شرح کالا/خدمات'),
+            _buildTableHeader('شرح کالا'),
             _buildTableHeader('تعداد'),
             _buildTableHeader('قیمت واحد'),
             _buildTableHeader('جمع'),
@@ -235,15 +240,28 @@ class InvoicePdfService {
         ...invoice.items.asMap().entries.map((entry) {
           final index = entry.key + 1;
           final item = entry.value;
+          
+          // تبدیل واحد انگلیسی به فارسی یا حذف
+          String unitText = '';
+          if (item.unit != null && item.unit!.isNotEmpty) {
+            if (item.unit == 'piece' || item.unit == 'pcs') {
+              unitText = 'عدد';
+            } else if (item.unit != 'عدد') {
+              unitText = item.unit!;
+            } else {
+              unitText = 'عدد';
+            }
+          }
+          
           return pw.TableRow(
             children: [
-              _buildTableCell(index.toString()),
+              _buildTableCell(NumberFormatter.toPersianNumber(index.toString())),
               _buildTableCell(
                 item.productName +
                     (item.description != null ? '\n${item.description}' : ''),
                 textAlign: pw.TextAlign.right,
               ),
-              _buildTableCell('${item.quantity.toStringAsFixed(0)} ${item.unit}'),
+              _buildTableCell('${NumberFormatter.toPersianNumber(item.quantity.toStringAsFixed(0))} $unitText'),
               _buildTableCell(_formatCurrency(item.unitPrice)),
               _buildTableCell(_formatCurrency(item.totalPrice)),
             ],
@@ -406,24 +424,12 @@ class InvoicePdfService {
 
   /// فرمت تاریخ فارسی
   String _formatDate(DateTime date) {
-    // TODO: استفاده از shamsi_date برای تبدیل به تاریخ شمسی
-    return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+    return date.toPersianDate();
   }
 
   /// فرمت قیمت
   String _formatCurrency(double amount) {
-    final formatted = amount.toStringAsFixed(0);
-    // اضافه کردن جداکننده هزارگان
-    final parts = <String>[];
-    var remaining = formatted;
-    while (remaining.length > 3) {
-      parts.insert(0, remaining.substring(remaining.length - 3));
-      remaining = remaining.substring(0, remaining.length - 3);
-    }
-    if (remaining.isNotEmpty) {
-      parts.insert(0, remaining);
-    }
-    return '${parts.join(',')} ریال';
+    return NumberFormatter.formatCurrency(amount);
   }
 
   /// نمایش پیش‌نمایش و چاپ

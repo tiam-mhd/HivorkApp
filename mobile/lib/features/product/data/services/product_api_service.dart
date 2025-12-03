@@ -379,5 +379,44 @@ class ProductApiService {
       }
     }
   }
+
+  // Autocomplete Search for Products with Variants
+  Future<List<Map<String, dynamic>>> autocomplete({
+    required String businessId,
+    String? search,
+    int limit = 10,
+    bool includeVariants = true,
+    bool inStockOnly = false,
+  }) async {
+    try {
+      print('🔍 [PRODUCT_API] Autocomplete search: "$search"');
+      
+      final response = await dio.get(
+        '/products/autocomplete',
+        queryParameters: {
+          'businessId': businessId,
+          if (search != null && search.isNotEmpty) 'search': search,
+          'limit': limit,
+          'includeVariants': includeVariants,
+          'inStockOnly': inStockOnly,
+        },
+      );
+
+      print('✅ [PRODUCT_API] Autocomplete response: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data as List<dynamic>;
+        return data.map((item) => item as Map<String, dynamic>).toList();
+      } else {
+        return [];
+      }
+    } on DioException catch (e) {
+      print('❌ [PRODUCT_API] Autocomplete error: ${e.message}');
+      return [];
+    } catch (e) {
+      print('❌ [PRODUCT_API] Autocomplete parse error: $e');
+      return [];
+    }
+  }
 }
 

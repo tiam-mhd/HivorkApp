@@ -11,11 +11,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 
-import 'core/theme/app_theme.dart';
 import 'core/theme/theme_notifier.dart';
 import 'core/constants/app_constants.dart';
 import 'core/router/multi_stream_refresh_notifier.dart';
 import 'core/network/auth_interceptor.dart';
+import 'core/network/dio_client.dart';
 import 'core/di/service_locator.dart';
 import 'features/auth/data/datasources/auth_api_service.dart';
 import 'features/auth/data/datasources/auth_local_datasource.dart';
@@ -39,6 +39,28 @@ import 'features/product/presentation/pages/variants_management_page.dart';
 import 'features/product/presentation/pages/stock_report_screen.dart';
 import 'features/invoice/data/services/invoice_provider.dart';
 import 'features/invoice/data/services/invoice_service.dart';
+import 'features/expense/providers/expense_provider.dart';
+import 'features/expense/services/expense_api_service.dart';
+import 'features/expense/services/expense_category_api_service.dart';
+import 'features/expense/providers/recurring_expense_provider.dart';
+import 'features/expense/services/recurring_expense_api_service.dart';
+import 'features/expense/pages/recurring_expenses_page.dart';
+import 'features/expense/pages/expense_categories_page.dart';
+import 'features/supplier/data/providers/supplier_provider.dart';
+import 'features/supplier/data/services/supplier_api_service.dart';
+import 'features/supplier/data/services/contact_api_service.dart';
+import 'features/supplier/data/services/supplier_product_api_service.dart';
+import 'features/supplier/data/services/document_api_service.dart';
+import 'features/supplier/presentation/pages/supplier_list_page.dart';
+import 'features/supplier/presentation/pages/supplier_detail_page.dart';
+import 'features/supplier/presentation/pages/supplier_form_page.dart';
+import 'features/purchase_order/data/providers/purchase_order_provider.dart';
+import 'features/purchase_order/data/services/purchase_order_api_service.dart';
+import 'features/purchase_order/data/services/payment_api_service.dart';
+import 'features/purchase_order/data/services/receipt_api_service.dart';
+import 'features/purchase_order/presentation/pages/purchase_order_list_page.dart';
+import 'features/purchase_order/presentation/pages/purchase_order_form_page.dart';
+import 'features/purchase_order/presentation/pages/purchase_order_detail_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,8 +91,21 @@ void main() async {
   final secureStorage = const FlutterSecureStorage();
   final sharedPreferences = await SharedPreferences.getInstance();
   
+  // Initialize AuthLocalDataSource early
+  final authLocalDataSource = AuthLocalDataSourceImpl(
+    secureStorage: secureStorage,
+    sharedPreferences: sharedPreferences,
+  );
+  
+  // Add auth interceptor to dio BEFORE initializing ServiceLocator
+  dio.interceptors.add(AuthInterceptor(authLocalDataSource));
+  
+  // Initialize ServiceLocator with dio that has auth interceptor
+  ServiceLocator().init(secureStorage, dio);
+  
   runApp(HivorkApp(
     dio: dio,
+    dioClient: DioClient(secureStorage),
     secureStorage: secureStorage,
     sharedPreferences: sharedPreferences,
   ));
@@ -78,12 +113,14 @@ void main() async {
 
 class HivorkApp extends StatefulWidget {
   final Dio dio;
+  final DioClient dioClient;
   final FlutterSecureStorage secureStorage;
   final SharedPreferences sharedPreferences;
 
   const HivorkApp({
     super.key,
     required this.dio,
+    required this.dioClient,
     required this.secureStorage,
     required this.sharedPreferences,
   });
@@ -115,17 +152,11 @@ class _HivorkAppState extends State<HivorkApp> {
       }
     });
     
-    // Initialize data sources and repositories
+    // Initialize data sources and repositories (AuthLocalDataSource already added to dio)
     final authLocalDataSource = AuthLocalDataSourceImpl(
       secureStorage: widget.secureStorage,
       sharedPreferences: widget.sharedPreferences,
     );
-    
-    // Add auth interceptor to dio
-    widget.dio.interceptors.add(AuthInterceptor(authLocalDataSource));
-    
-    // Initialize ServiceLocator با همان dio که auth interceptor داره
-    ServiceLocator().init(widget.secureStorage, widget.dio);
     
     final authApiService = AuthApiService(widget.dio);
     final authRepository = AuthRepositoryImpl(
@@ -290,6 +321,72 @@ class _HivorkAppState extends State<HivorkApp> {
           builder: (context, state) => const MainDashboardPage(),
         ),
         GoRoute(
+          path: '/suppliers',
+          builder: (context, state) {
+            final businessId = state.extra as String? ?? '';
+            print('🔥 ROUTE DEBUG: businessId from extra = "$businessId"');
+            return SupplierListPage(businessId: businessId);
+          },
+        ),
+        GoRoute(
+          path: '/supplier/create',
+          builder: (context, state) {
+            final businessId = state.extra as String? ?? '';
+            return SupplierFormPage(businessId: businessId);
+          },
+        ),
+        GoRoute(
+          path: '/supplier/:id',
+          builder: (context, state) {
+            final supplierId = state.pathParameters['id'] ?? '';
+            final extra = state.extra as Map<String, String>? ?? {};
+            final businessId = extra['businessId'] ?? '';
+            return SupplierDetailPage(
+              supplierId: supplierId,
+              businessId: businessId,
+            );
+          },
+        ),
+        // Purchase Order Routes
+        GoRoute(
+          path: '/purchase-orders',
+          builder: (context, state) {
+            final businessId = state.extra as String? ?? '';
+            return PurchaseOrderListPage(businessId: businessId);
+          },
+        ),
+        GoRoute(
+          path: '/purchase-order/create',
+          builder: (context, state) {
+            final businessId = state.extra as String? ?? '';
+            return PurchaseOrderFormPage(businessId: businessId);
+          },
+        ),
+        GoRoute(
+          path: '/purchase-order/:id',
+          builder: (context, state) {
+            final orderId = state.pathParameters['id'] ?? '';
+            final extra = state.extra as Map<String, String>? ?? {};
+            final businessId = extra['businessId'] ?? '';
+            return PurchaseOrderDetailPage(
+              purchaseOrderId: orderId,
+              businessId: businessId,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/purchase-order/:id/edit',
+          builder: (context, state) {
+            final orderId = state.pathParameters['id'] ?? '';
+            final extra = state.extra as Map<String, String>? ?? {};
+            final businessId = extra['businessId'] ?? '';
+            return PurchaseOrderFormPage(
+              businessId: businessId,
+              purchaseOrderId: orderId,
+            );
+          },
+        ),
+        GoRoute(
           path: '/create-business',
           builder: (context, state) => const CreateBusinessPage(),
         ),
@@ -349,6 +446,20 @@ class _HivorkAppState extends State<HivorkApp> {
             return StockReportScreen(businessId: businessId);
           },
         ),
+        GoRoute(
+          path: '/expenses/recurring',
+          builder: (context, state) {
+            final businessId = state.extra as String? ?? '';
+            return RecurringExpensesPage(businessId: businessId);
+          },
+        ),
+        GoRoute(
+          path: '/expenses/categories',
+          builder: (context, state) {
+            final businessId = state.extra as String? ?? '';
+            return ExpenseCategoriesPage(businessId: businessId);
+          },
+        ),
       ],
     );
     
@@ -370,7 +481,33 @@ class _HivorkAppState extends State<HivorkApp> {
         ChangeNotifierProvider.value(value: _themeNotifier),
         ChangeNotifierProvider(
           create: (_) => InvoiceProvider(
-            InvoiceService(ServiceLocator().dio),
+            InvoiceService(widget.dio),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ExpenseProvider(
+            ExpenseApiService(widget.dio),
+            ExpenseCategoryApiService(widget.dio),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => RecurringExpenseProvider(
+            RecurringExpenseApiService(widget.dio),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SupplierProvider(
+            SupplierApiService(widget.dio),
+            ContactApiService(widget.dio),
+            SupplierProductApiService(widget.dio),
+            DocumentApiService(widget.dio),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => PurchaseOrderProvider(
+            PurchaseOrderApiService(widget.dio),
+            PaymentApiService(widget.dio),
+            ReceiptApiService(widget.dio),
           ),
         ),
       ],
